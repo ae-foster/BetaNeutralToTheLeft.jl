@@ -32,38 +32,30 @@ function clean_corpus!(crps::Corpus)
 end
 
 function getDocumentTermMatrixFromReviewsJson(filename::String)
+    f = JSON.parsefile(filename; dicttype=OrderedDict, inttype=Int64, use_mmap=true)
+    N = length(f)
+    z = Array{String}(N)
+    reviews = Array{StringDocument}(N)
+    timestamps = Array{Int}(N)
 
-f = JSON.parsefile(filename; dicttype=OrderedDict, inttype=Int64, use_mmap=true)
-N = length(f)
-z = Array{String}(N)
-reviews = Array{StringDocument}(N)
-timestamps = Array{Int}(N)
+    index = 1
+    for review in f
+        z[index] = review["asin"]
+        timestamps[index] = review["unixReviewTime"]
+        reviews[index] = StringDocument(review["reviewText"])
+        index += 1
+    end
 
-index = 1
-for review in f
-    z[index] = review["asin"]
-    timeStamps[index] = review["unixReviewTime"]
-    reviews[index] = StringDocument(review["reviewText"])
-    index += 1
+    timestamp_ordering = sortperm(timestamps)
+    z = z[timestamp_ordering]
+    reviews = reviews[timestamp_ordering]
+
+    crps = Corpus(Any[reviews...])
+    clean_corpus!(crps)
+
+    # hash_dtm(crps) # avoid having to compute the lexicon
+    update_lexicon!(crps)
+    m = DocumentTermMatrix(crps)
+    # m = tf_idf(m)
+    dtm(m)
 end
-
-timestamp_ordering = sortperm(timestamps)
-z = z[timestamp_ordering]
-reviews = reviews[timestamp_ordering]
-
-crps = Corpus(Any[reviews...])
-clean_corpus!(crps)
-
-# hash_dtm(crps) # avoid having to compute the lexicon
-update_lexicon!(crps)
-m = DocumentTermMatrix(crps)
-# m = tf_idf(m)
-x = dtm(m) # dtm(m, :dense)
-
-return x
-end
-
-# Download http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Musical_Instruments_5.json.gz
-filename = "/Users/EmileMathieu/code/NTL/reviews.json"
-# Base.run(`sed '1s/^/[/;$!s/$/,/;$s/$/]/' reviews_Musical_Instruments_5.json > reviews.json`)
-x = getDocumentTermMatrixFromReviewsJson(filename)
