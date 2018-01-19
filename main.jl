@@ -5,9 +5,7 @@ debug = false
 
 if true_dataset # Data from source
     include("dataset.jl")
-    # Download http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Musical_Instruments_5.json.gz
     filename = "./reviews.json"
-    # Base.run(`sed '1s/^/[/;$!s/$/,/;$s/$/]/' reviews_Musical_Instruments_5.json > reviews.json`)
     X = getDocumentTermMatrixFromReviewsJson(filename)
     X = X[1:500, :]
     N, D = size(X)
@@ -53,13 +51,6 @@ epsilon = 0.1
 p = Progress(N, .5, "Observation n°: ", 50)
 qz[1, 1] = 0 # Initialize first data point
 qtheta[:, 1] = dir_prior_param + X[1, :] # Initialize qtheta posterior given x_1
-
-function p_dirichlet_multinomial(x::Union{Vector,SparseVector}, alpha::Vector)
-    # cf https://en.wikipedia.org/wiki/Dirichlet-multinomial_distribution
-    n_x = sum(x)
-    alpha_0 = sum(alpha)
-    return factorial(n_x)*gamma(alpha_0)/gamma(n_x+alpha_0)*prod([gamma(x_k+alpha_k)/factorial(x_k)/gamma(alpha_k) for (x_k, alpha_k) in zip(x, alpha)])
-end
 
 function logp_dirichlet_multinomial(x::Union{Vector,SparseVector}, alpha::Vector)
     # cf https://en.wikipedia.org/wiki/Dirichlet-multinomial_distribution
