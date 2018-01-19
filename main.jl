@@ -56,8 +56,8 @@ function logp_dirichlet_multinomial(x::Union{Vector,SparseVector}, alpha::Vector
     # cf https://en.wikipedia.org/wiki/Dirichlet-multinomial_distribution
     n_x = sum(x)
     alpha_0 = sum(alpha)
-    nz = [(x_k, alpha_k) for (x_k, alpha_k) in zip(x, alpha) if x_k > 0]
-    return log(n_x) + lbeta(alpha_0, n_x) - sum([log(x_k) + lbeta.(x_k, alpha_k) for (x_k, alpha_k) in nz])
+    mask = findnz(x)[1]
+    return log(n_x) + lbeta(alpha_0, n_x) - sum(log(x[mask])) + sum(lbeta.(x[mask], alpha[mask]))
 end
 
 function qzn_pr_estimator_1(S_n::Vector, n::Int, K_max::Int, alpha::Float64)
@@ -86,6 +86,8 @@ for n = 2:N
     ProgressMeter.update!(p, n)
     print_debug("n: ", n)
     print_debug("K_max: ", K_max)
+
+    # Exclude empty documents: they cause NaNs
     if sum(X[n, :]) == 0
         continue
     end
@@ -181,6 +183,6 @@ if !true_dataset println("qz: ", qz) end
 
 
 println("q_pr ", q_pr_time)
-println("dir", dir_time)
-println("new cluster", new_cluster_time)
-println("qtheta", qtheta_time)
+println("dir ", dir_time)
+println("new cluster ", new_cluster_time)
+println("qtheta ", qtheta_time)
