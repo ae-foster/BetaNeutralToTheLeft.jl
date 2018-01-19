@@ -1,7 +1,7 @@
 using ProgressMeter
 
 true_dataset = true
-debug = true
+debug = false
 
 if true_dataset # Data from source
     include("dataset.jl")
@@ -76,9 +76,13 @@ function print_debug(args...)
     end
 end
 
+q_pr_time = 0
+dir_time = 0
+new_cluster_time = 0
+qtheta_time = 0
+
 for n = 2:N
     tic()
-    println("q_pr")
     ProgressMeter.update!(p, n)
     print_debug("n: ", n)
     print_debug("K_max: ", K_max)
@@ -102,9 +106,8 @@ for n = 2:N
 
     print_debug("qzn_pr ", qzn_pr)
     print_debug("qzn_pr_new ", qzn_pr_new)
-    toc()
+    q_pr_time += toc()
     tic()
-    println("dirichlet, normalize")
 
     # Should have
     # sum(exp(qzn_pr)) + exp(qzn_pr_new) = 1
@@ -131,7 +134,7 @@ for n = 2:N
     print_debug("qzn_new", qzn_new)
 
     log_new_cluster_prob = qzn_new - log(exp(qzn_new) + sum(exp.(qz[n, :])))
-    toc()
+    dir_time += toc()
 
     # Should create a new cluster ?
     print_debug("log_new_cluster_prob: ", log_new_cluster_prob)
@@ -146,10 +149,9 @@ for n = 2:N
         qtheta = hcat(qtheta, dir_prior_param)
         qz = hcat(qz, -Inf*ones(Float64, N, 1))
         qz[n, K_max] = qzn_new
-        toc()
+        new_cluster_time += toc()
     end
     tic()
-    println("update qtheta, s_n")
 
     print_debug("Unnormalized ", qz[n, :])
     qz[n, 1:K_max] -= log(sum(exp.(qz[n, 1:K_max]))) # normalization
@@ -167,7 +169,7 @@ for n = 2:N
             Sprod[k] *= Scdf
         end
     end
-    toc()
+    qtheta_time += toc()
 
 end
 # print_debug(qz)
@@ -176,3 +178,9 @@ println("D: ", D)
 println("K_max: ", K_max)
 println("qz: ", exp.(qz[1:10,1:10]))
 if !true_dataset println("qz: ", qz) end
+
+
+println("q_pr ", q_pr_time)
+println("dir", dir_time)
+println("new cluster", new_cluster_time)
+println("qtheta", qtheta_time)
