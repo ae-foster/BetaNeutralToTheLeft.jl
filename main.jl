@@ -3,22 +3,22 @@ using ProgressMeter
 true_dataset = true
 
 if true_dataset # Data from source
-include("dataset.jl")
-# Download http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Musical_Instruments_5.json.gz
-filename = "/Users/EmileMathieu/code/NTL/reviews.json"
-# Base.run(`sed '1s/^/[/;$!s/$/,/;$s/$/]/' reviews_Musical_Instruments_5.json > reviews.json`)
-X = getDocumentTermMatrixFromReviewsJson(filename)
-N, D = size(X)
+    include("dataset.jl")
+    # Download http://snap.stanford.edu/data/amazon/productGraph/categoryFiles/reviews_Musical_Instruments_5.json.gz
+    filename = "./reviews.json"
+    # Base.run(`sed '1s/^/[/;$!s/$/,/;$s/$/]/' reviews_Musical_Instruments_5.json > reviews.json`)
+    X = getDocumentTermMatrixFromReviewsJson(filename)
+    N, D = size(X)
 
 else # Synthetic data
-D = 4 # vocab size
-N = 5 # data size
-X = Matrix{Int32}(N,D)
-X = reshape([1 1 0 0
-             2 1 0 1
-             0 0 2 1
-             0 0 1 2
-             1 2 1 0 ], N, D)
+    D = 4 # vocab size
+    N = 5 # data size
+    X = Matrix{Int32}(N,D)
+    X = reshape([1 1 0 0
+                 2 1 0 1
+                 0 0 2 1
+                 0 0 1 2
+                 1 2 1 0 ], N, D)
 end
 
 # Variational distributions: Mean field approximation
