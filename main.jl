@@ -1,6 +1,7 @@
 using ProgressMeter
 
 true_dataset = true
+debug = false
 
 if true_dataset # Data from source
     include("dataset.jl")
@@ -8,6 +9,7 @@ if true_dataset # Data from source
     filename = "./reviews.json"
     # Base.run(`sed '1s/^/[/;$!s/$/,/;$s/$/]/' reviews_Musical_Instruments_5.json > reviews.json`)
     X = getDocumentTermMatrixFromReviewsJson(filename)
+    X = X[1:500, :]
     N, D = size(X)
 
 else # Synthetic data
@@ -21,18 +23,27 @@ else # Synthetic data
                  1 2 1 0 ], N, D)
 end
 
-# Variational distributions: Mean field approximation
+#######################################################
+## Variational distributions: Mean field approximation
+#######################################################
+
+# K_max = Number of clusters allocated
 K_max = 1
-qz = zeros(Float64, N, K_max) # Categorical/Discrete
-qtheta = zeros(Float64, D, K_max) # natural parameter of a Dirichlet
+# qz[i, :] represents the log probability that observation i is attribuetd to cluster k
+qz = -Inf*ones(Float64, N, K_max)
+# qtheta[:, k] represent natural parameter of a Dirichlet for cluster k
+qtheta = zeros(Float64, D, K_max)
 
 # Prior (hyper)parameters
-dir_prior_param = ones(Float64, D)
+dir_prior_param = 0.01 * ones(Float64, D)
 a = 0.1 # inter-arrival Geometric success parameter
 alpha = 0.5 # Neutral to the left parameter
 
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
+# Method for estimating qz
+qzn_estimator_method = 1
+# Only updated when using qzn_estimator_method == 2
 Sprod = ones(Float64, K_max) # for efficiently computing E[K_{n-1}]
 
 # Threshold for new cluster
@@ -40,7 +51,7 @@ epsilon = 0.1
 
 # Initialization <=> First iteration
 p = Progress(N, .5, "Observation n°: ", 50)
-qz[1, 1] = 1 # Initialize first data point
+qz[1, 1] = 0 # Initialize first data point
 qtheta[:, 1] = dir_prior_param + X[1, :] # Initialize qtheta posterior given x_1
 
 function p_dirichlet_multinomial(x::Union{Vector,SparseVector}, alpha::Vector)
@@ -54,66 +65,112 @@ function logp_dirichlet_multinomial(x::Union{Vector,SparseVector}, alpha::Vector
     # cf https://en.wikipedia.org/wiki/Dirichlet-multinomial_distribution
     n_x = sum(x)
     alpha_0 = sum(alpha)
-    return lfact(n_x)+lgamma(alpha_0)-lgamma(n_x+alpha_0)+sum([lgamma(x_k+alpha_k)-lfact(x_k)-lgamma(alpha_k) for (x_k, alpha_k) in zip(x, alpha)])
+    nz = [(x_k, alpha_k) for (x_k, alpha_k) in zip(x, alpha) if x_k > 0]
+    return log(n_x) + lbeta(alpha_0, n_x) - sum([log(x_k) + lbeta.(x_k, alpha_k) for (x_k, alpha_k) in nz])
 end
 
-function qzn_pr_estimator_1(S_n::Vector, n::Int, K_max::Int, a::Float64, alpha::Float64)
-    (1 - a) * max((S_n - alpha),0) / (n - 1 - alpha*K_max)
+function qzn_pr_estimator_1(S_n::Vector, n::Int, K_max::Int, alpha::Float64)
+    unnormalized = max.((S_n - alpha),0)
+    lp = log.(unnormalized ./ sum(unnormalized))
+    return lp
 end
 
 function qzn_pr_estimator_2(S_n::Vector, Sprod::Vector, n::Int, K_max::Int, a::Float64, alpha::Float64)
     (1 - a) * max((S_n - alpha),0) / (n - 1 - alpha*(K_max - sum(Sprod)))
 end
 
+function print_debug(args...)
+    if debug == true
+        println(args...)
+    end
+end
+
 for n = 2:N
     ProgressMeter.update!(p, n)
-    println("n: ", n)
-    if n > 10 break end
+    print_debug("n: ", n)
+    print_debug("K_max: ", K_max)
+    if sum(X[n, :]) == 0
+        continue
+    end
 
     ## Update local latent variable distributions qz_pr
     # First projection: Propagate (projection of predition term)
     # NOTE: function for different approximations (MC, 2nd term correction, etc)
-    println("S_n: ", S_n)
-    println("Sprod: ", Sprod)
-    qzn_pr = qzn_pr_estimator_1(S_n, n, K_max, a, alpha)
-    qzn_pr_new = a
+    # print_debug("S_n: ", S_n)
+    # if qzn_estimator_method == 2
+    #     print_debug("Sprod: ", Sprod)
+    # end
+    if qzn_estimator_method == 1
+        qzn_pr = log(1-a) + qzn_pr_estimator_1(S_n, n, K_max, alpha)
+    elseif qzn_estimator_method != 1
+        error("Currently unsupported")
+    end
+    qzn_pr_new = log(a)
+
+    print_debug("qzn_pr ", qzn_pr)
+    print_debug("qzn_pr_new ", qzn_pr_new)
+
+    # Should have
+    # sum(exp(qzn_pr)) + exp(qzn_pr_new) = 1
 
     # Second projection: Use marginalization of conjugate exp fam
     # i.e. substraction in natural parameter space
     for k = 1:K_max
-        qz[n,k] = qzn_pr[k] * exp(logp_dirichlet_multinomial(X[n, :], qtheta[:, k]))
+        qz[n,k] = qzn_pr[k] + logp_dirichlet_multinomial(X[n, :], qtheta[:, k])
+        if isnan(qz[n,k])
+            print_debug("That was a NaN")
+            print_debug(X[n, :])
+            print_debug(qtheta[:, k])
+            error()
+        end
     end
-    qzn_new = qzn_pr_new * exp(logp_dirichlet_multinomial(X[n, :], dir_prior_param))
+    qzn_new = qzn_pr_new + logp_dirichlet_multinomial(X[n, :], dir_prior_param)
+
+    # Multiply this unnormalized distribution by a constant
+    offset = max.(qz[n, :], qzn_new)[1]
+    qz[n,:] -= offset
+    qzn_new -= offset
+
+    print_debug("qz[n,:] ", qz[n,:])
+    print_debug("qzn_new", qzn_new)
+
+    log_new_cluster_prob = qzn_new - log(exp(qzn_new) + sum(exp.(qz[n, :])))
 
     # Should create a new cluster ?
-    println("qz[n,:]: ", qz[n,:])
-    println("qzn_new: ", qzn_new)
-    println("qzn_new norm: ", qzn_new/(sum(qz[n,:])+qzn_new))
-    if qzn_new/(sum(qz[n,1:K_max])+qzn_new) > epsilon
-        println("New cluster")
+    print_debug("log_new_cluster_prob: ", log_new_cluster_prob)
+    if log_new_cluster_prob > log(epsilon)
+        print_debug("New cluster")
         K_max += 1
         push!(S_n, 0)
-        push!(Sprod, 1)
+        if qzn_estimator_method == 2
+            push!(Sprod, 1)
+        end
         qtheta = hcat(qtheta, dir_prior_param)
-        qz = hcat(qz, zeros(Float64, N, 1))
+        qz = hcat(qz, -Inf*ones(Float64, N, 1))
         qz[n, K_max] = qzn_new
     end
-    qz[n, 1:K_max] /= sum(qz[n, 1:K_max]) # normalization
+
+    print_debug("Unnormalized ", qz[n, :])
+    qz[n, 1:K_max] -= log(sum(exp.(qz[n, 1:K_max]))) # normalization
+    print_debug("Normalized ", qz[n, :])
 
     # Update global parameter approximation qtheta
-    Scdf = 0
-    S_n += qz[n, 1:K_max] # sufficient stats for expectation of n_k
-    for k = 1:K_max
-        qtheta[:, k] += qz[n, k] * X[n, :] # update global parameter # Note: wrong ??
-        # Sufficient stats for expectation of Kn
-        Scdf += qz[n, k]
-        Sprod[k] *= Scdf
+    S_n += exp.(qz[n, 1:K_max]) # sufficient stats for expectation of n_k
+
+    if qzn_estimator_method == 2
+        Scdf = 0
+        for k = 1:K_max
+            qtheta[:, k] += qz[n, k] * X[n, :] # update global parameter # Note: wrong ??
+            # Sufficient stats for expectation of Kn
+            Scdf += qz[n, k]
+            Sprod[k] *= Scdf
+        end
     end
 
 end
-# println(qz)
+# print_debug(qz)
 println("N: ", N)
 println("D: ", D)
 println("K_max: ", K_max)
-println("qz: ", qz[1:10,:])
+println("qz: ", exp.(qz[1:10,1:10]))
 if !true_dataset println("qz: ", qz) end
