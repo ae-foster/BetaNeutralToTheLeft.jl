@@ -1,7 +1,7 @@
 using ProgressMeter
 
 true_dataset = true
-debug = false
+debug = true
 
 if true_dataset # Data from source
     include("dataset.jl")
@@ -77,6 +77,8 @@ function print_debug(args...)
 end
 
 for n = 2:N
+    tic()
+    println("q_pr")
     ProgressMeter.update!(p, n)
     print_debug("n: ", n)
     print_debug("K_max: ", K_max)
@@ -100,6 +102,9 @@ for n = 2:N
 
     print_debug("qzn_pr ", qzn_pr)
     print_debug("qzn_pr_new ", qzn_pr_new)
+    toc()
+    tic()
+    println("dirichlet, normalize")
 
     # Should have
     # sum(exp(qzn_pr)) + exp(qzn_pr_new) = 1
@@ -126,11 +131,13 @@ for n = 2:N
     print_debug("qzn_new", qzn_new)
 
     log_new_cluster_prob = qzn_new - log(exp(qzn_new) + sum(exp.(qz[n, :])))
+    toc()
 
     # Should create a new cluster ?
     print_debug("log_new_cluster_prob: ", log_new_cluster_prob)
     if log_new_cluster_prob > log(epsilon)
-        print_debug("New cluster")
+        tic()
+        println("New cluster")
         K_max += 1
         push!(S_n, 0)
         if qzn_estimator_method == 2
@@ -139,7 +146,10 @@ for n = 2:N
         qtheta = hcat(qtheta, dir_prior_param)
         qz = hcat(qz, -Inf*ones(Float64, N, 1))
         qz[n, K_max] = qzn_new
+        toc()
     end
+    tic()
+    println("update qtheta, s_n")
 
     print_debug("Unnormalized ", qz[n, :])
     qz[n, 1:K_max] -= log(sum(exp.(qz[n, 1:K_max]))) # normalization
@@ -148,15 +158,16 @@ for n = 2:N
     # Update global parameter approximation qtheta
     S_n += exp.(qz[n, 1:K_max]) # sufficient stats for expectation of n_k
 
-    if qzn_estimator_method == 2
-        Scdf = 0
-        for k = 1:K_max
-            qtheta[:, k] += qz[n, k] * X[n, :] # update global parameter # Note: wrong ??
+    Scdf = 0
+    for k = 1:K_max
+        qtheta[:, k] += exp.(qz[n, k]) .* X[n, :] # update global parameter # Note: wrong ??
+        if qzn_estimator_method == 2
             # Sufficient stats for expectation of Kn
             Scdf += qz[n, k]
             Sprod[k] *= Scdf
         end
     end
+    toc()
 
 end
 # print_debug(qz)
