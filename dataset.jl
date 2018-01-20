@@ -57,5 +57,5 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
     update_lexicon!(crps)
     m = DocumentTermMatrix(crps)
     # m = tf_idf(m)
-    dtm(m)
+    z, dtm(m)
 end

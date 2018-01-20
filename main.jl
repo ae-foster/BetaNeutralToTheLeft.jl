@@ -6,7 +6,7 @@ debug = false
 if true_dataset # Data from source
     include("dataset.jl")
     filename = "./reviews.json"
-    X = getDocumentTermMatrixFromReviewsJson(filename)
+    z, X = getDocumentTermMatrixFromReviewsJson(filename)
     X = X[1:500, :]
     N, D = size(X)
 
