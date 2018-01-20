@@ -29,7 +29,7 @@ end
 K_max = 1
 # qz[i, :] represents the log probability that observation i is attribuetd to cluster k
 qz = -Inf*ones(Float64, N, K_max)
-# qtheta[:, k] represent natural parameter of a Dirichlet for cluster k
+# qtheta[:, k] represent the parameter (usually called alpha) of a Dirichlet for cluster k
 qtheta = zeros(Float64, D, K_max)
 
 # Prior (hyper)parameters
@@ -164,7 +164,7 @@ for n = 2:N
 
     Scdf = 0
     for k = 1:K_max
-        qtheta[:, k] += exp.(qz[n, k]) .* X[n, :] # update global parameter # Note: wrong ??
+        qtheta[:, k] += exp.(qz[n, k]) .* X[n, :] # update global parameter
         if qzn_estimator_method == 2
             # Sufficient stats for expectation of Kn
             Scdf += qz[n, k]
