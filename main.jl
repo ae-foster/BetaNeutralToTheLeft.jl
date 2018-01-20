@@ -35,6 +35,7 @@ qtheta = zeros(Float64, D, K_max)
 # Prior (hyper)parameters
 dir_prior_param = 0.01 * ones(Float64, D)
 a = 0.1 # inter-arrival Geometric success parameter
+a_prime = 1; b_prime = 1; Beta prior on a
 alpha = 0.5 # Neutral to the left parameter
 
 # Partial sums for qz^pr
@@ -43,6 +44,11 @@ S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
 qzn_estimator_method = 1
 # Only updated when using qzn_estimator_method == 2
 Sprod = ones(Float64, K_max) # for efficiently computing E[K_{n-1}]
+
+# Only updated when using qzn_estimator_method == 3 # Monte Carlo
+M = 10
+nk_stats = zeros(Int, M, K_max)
+T_Kprev = zeros(Int, M)
 
 # Threshold for new cluster
 epsilon = 0.1
@@ -68,6 +74,31 @@ end
 
 function qzn_pr_estimator_2(S_n::Vector, Sprod::Vector, n::Int, K_max::Int, a::Float64, alpha::Float64)
     (1 - a) * max((S_n - alpha),0) / (n - 1 - alpha*(K_max - sum(Sprod)))
+end
+
+function qzn_pr_estimator_MC(qz_prev::Matrix, nk_stats, T_Kprev, M::Int, n::Int, K_max::Int, a::Float64, alpha::Float64)
+    # /!\ NOT TESTED YET
+    # Monte Carlo estimate with M samples
+    # nk_stats Matrix of size MxKmax with n_k
+    # T_Kprev vector of size M with T_K_{n-1}
+
+    qz_prev_samples = wsample(1:K_max, qz_prev, M) # z ~ \hat{q}_{n-1}(.)
+
+    # update nk
+    for m in 1:M
+        if nk_stats[m, qz_prev_samples[m]] == 0 T_Kprev[m] = n-1 end
+        nk_stats[m, qz_prev_samples[m]] += 1
+    end
+    Kprev = sum(nk_stats .!= 0, 2)
+
+    qzn_pr = zeros(Float64, K_max + 1)
+    p_new_cluster = (Kprev - 1 + a_prime) ./ (T_Kprev + a_prime + b_prime)
+    qzn_pr[Kmax+1] = mean(p_new_cluster)
+    for k in 1:Kmax
+        qzn_pr[k] = mean( (1 - p_new_cluster) .* (nk_stats[:,k] - alpha) ./ (n - 1 - alpha.*Kprev) )
+    end
+
+    nk_stats, T_Kprev, log.(qzn_pr[1:Kmax]),  log(qzn_pr[Kmax+1])
 end
 
 function print_debug(args...)
