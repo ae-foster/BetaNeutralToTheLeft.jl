@@ -133,7 +133,7 @@ for n = 2:N
         log_qzn_pr = log(1-a) + qzn_pr_estimator_1(S_n, n, K_max, alpha)
         log_qzn_pr_new = log(a)
     elseif qzn_estimator_method == 3
-        nk_stats,T_Kprev,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,:]), nk_stats, T_Kprev, M, n, K_max, a, alpha)
+        nk_stats,T_Kprev,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,1:K_max]), nk_stats, T_Kprev, M, n, K_max, a, alpha)
     else
         error("Currently unsupported")
     end
