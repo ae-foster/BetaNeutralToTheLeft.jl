@@ -1,0 +1,5 @@
+julia 0.6
+Distributions
+ProgressMeter
+JSON
+TextAnalysis c52f79dc10e2ac6d2e196953519d9f1a02baf8c9
