@@ -15,9 +15,10 @@ Obtain training data as follows
 Add the following packages:
  - JSON
  - ProgressMeter
+ - Distributions
 
 For the TextAnalysis package, use:
 
     Pkg.checkout("TextAnalysis")
 
-rather than the conventional `Pkg.add`
+rather than the conventional `Pkg.add` to get the master branch
