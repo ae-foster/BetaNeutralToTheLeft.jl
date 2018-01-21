@@ -6,9 +6,10 @@ debug = false
 
 if true_dataset # Data from source
     include("dataset.jl")
-    filename = "./reviews.json"
+    filename = "/Users/EmileMathieu/code/NTL/reviews.json"
     z, X = getDocumentTermMatrixFromReviewsJson(filename)
-    X = X[1:500, :]
+    X = X[1:200, :]
+    z = z[1:200]
     N, D = size(X)
 
 else # Synthetic data
