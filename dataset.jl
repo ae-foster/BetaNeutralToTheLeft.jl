@@ -61,28 +61,46 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
     z, dtm(m)
 end
 
-function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Vector)
-    @assert length(alpha) == D
+function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Float64, dir_prior_param::Vector)
+    # N: number of observations/documents
+    # D: size of vocabulary
+    # n_x: number of word per document
+    # a: Geometric parameter for inter-arrival times
+    # alpha: Neutral to the left parameter
+    # dir_prior_param: Dirichlet's parameter
+    @assert length(dir_prior_param) == D
+
     z = zeros(Int, N)
     X = zeros(Int, N, D)
-    Ts = [1]
-    while Ts[end] < N
+
+    # Sample arrival times
+    T = 1
+    Ts = [T]
+    while T < N
         geo = rand(Geometric(a)) + 1
-        T = Int(Ts[end]) + rand(Geometric(a))
+        T += geo
         push!(Ts, T)
     end
+
+    # Sample observations/documents
+    thetas = zeros(Float64, length(Ts)+1, D)
     K = 1
-    theta = rand(Dirichlet(alpha))
+    nk = zeros(Int, K)
     for n in 1:N
-        println("Ts[K]: ", Ts[K])
         if Ts[K] == n
+            # Sample and assign to a new cluster
             K += 1
-            theta = rand(Dirichlet(alpha))
+            thetas[K, :] = rand(Dirichlet(dir_prior_param))
+            push!(nk, 0)
+            z[n] = K
+        else
+            # Choose an existing cluster
+            w = (nk - alpha) ./ (n - 1 - alpha*K)
+            z[n] = wsample(1:K, w)
         end
-        z[n] = K
-        X[n, :] = rand(Multinomial(n_x, theta))
+        nk[z[n]] += 1
+        X[n, :] = rand(Multinomial(n_x, thetas[K, :]))
     end
 
-    perm = randperm(N)
-    return z[perm], X[perm, :]
+    return z, X
 end
