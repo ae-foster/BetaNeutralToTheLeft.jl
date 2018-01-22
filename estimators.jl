@@ -29,3 +29,24 @@ function qzn_pr_estimator_MC(qz_prev:: Vector, nk_stats::Matrix, T_Kprev::Vector
 
     nk_stats, T_Kprev, log.(qzn_pr[1:K_max]),  log(qzn_pr[K_max+1])
 end
+
+function qzn_pr_estimator_NRM(S_n::Vector, Sprod::Vector, n::Int, K_max::Int, a::Float64, tau::Float64, sigma::Float64)
+    log_qzn_pr = zeros(Float64, K_max + 1)
+    log_qzn_pr[1:K_max] = log(max.(S_n - sigma, 0))
+
+    Kprev = (K_max - sum(Sprod))
+
+    log_q = (U) -> -a/tau*(U + tau)^sigma + (n-1)*log(U) -(n - 1 - a*Kprev)*log(U + tau)
+    grad_log_q = (U) -> -a/tau*(U + tau)^(sigma-1) + (n-1)/U -(n - 1 - a*Kprev)/(U + tau)
+    Un_hat = 0
+    last_log_q = log_q(Un_hat)
+    step_size = 0.1
+    while true
+        Un_hat += step_size * grad_log_q(Un_hat)
+        (abs(log_q(Un_hat) - last_log_q) < 0.01) && break
+    end
+
+    log_qzn_pr[K_max+1] = log(a) + sigma * log(Un_hat + tau)
+
+    return log_qzn_pr[1:K_max], log_qzn_pr[K_max+1]
+end
