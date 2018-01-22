@@ -11,7 +11,6 @@ end
 function qzn_pr_estimator_MC(qz_prev:: Vector, nk_stats::Matrix, M::Int, n::Int, K_max::Int, alpha::Float64, a_prime::Real, b_prime::Real)
     # Monte Carlo estimate with M samples
     # nk_stats Matrix of size MxKmax with n_k
-
     qz_prev_samples = wsample(1:K_max, qz_prev, M) # z ~ \hat{q}_{n-1}(.)
     # update nk
     for m in 1:M
@@ -22,7 +21,7 @@ function qzn_pr_estimator_MC(qz_prev:: Vector, nk_stats::Matrix, M::Int, n::Int,
     p_new_cluster = (a_prime + Kprev - 1) ./ (a_prime + b_prime + n - 2)
     qzn_pr[K_max+1] = mean(p_new_cluster)
     for k in 1:K_max
-        qzn_pr[k] = mean( (1 - p_new_cluster) .* (nk_stats[:,k] - alpha) ./ (n - 1 - alpha.*Kprev) )
+        qzn_pr[k] = mean( (1 - p_new_cluster) .* max.(nk_stats[:,k] - alpha, 0) ./ (n - 1 - alpha.*Kprev) )
     end
 
     nk_stats, log.(qzn_pr[1:K_max]),  log(qzn_pr[K_max+1])
