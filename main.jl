@@ -10,8 +10,6 @@ if true_dataset # Data from source
     include("dataset.jl")
     filename = "./reviews.json"
     z, X = getDocumentTermMatrixFromReviewsJson(filename)
-    X = X[1:10000, :]
-    z = z[1:10000]
     N, D = size(X)
 
 else # Synthetic data
