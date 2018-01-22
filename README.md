@@ -4,13 +4,21 @@ For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnx
 
 ## TODO
 
-- Make it scale
- - Why global parameter update is slow ??
+ - Improved estimator for K_{n-1}
+ - For positive alpha, epsilon = alpha. Accumulate discarded probability
+ - Synthetic data with Gaussian emissions
+ - Train on bigger Amazon data on ziz
+ - Compare (synthetic Gaussian data) with a NRM model using Alex Tank's VI
+ - Other estimates of q^pr
+   - MC estimate
+   - 2nd order Taylor expansions
+ - Case of negative alpha
+ - Instantiate clusters randomly
+ - Metrics for coclustering matrix
+
  - Preallocate matrices ?
- - Faster log likelihood of Dirichlet-Multinomial distribution ?
-- Mean field + taylor expension (1st order) approximation, for model with prior on Geometric parameter
-- 2nd order Taylor expension ?
-- predictive log-likelihood metric ?
+ - (possible) Faster log likelihood of Dirichlet-Multinomial distribution ?
+ - predictive log-likelihood metric ?
 
 ## Data
 
