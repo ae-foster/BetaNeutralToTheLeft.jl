@@ -18,14 +18,7 @@ if true_dataset # Data from source
     N, D = size(X)
 
 else # Synthetic data
-    D = 4 # vocab size
-    N = 5 # data size
-    X = Matrix{Int32}(N,D)
-    X = reshape([1 1 0 0
-                 2 1 0 1
-                 0 0 2 1
-                 0 0 1 2
-                 1 2 1 0 ], N, D)
+    z, X = generateDataset(100, 10, 3, .5, 0.5, 0.1*ones(10))
 end
 
 #######################################################
@@ -205,7 +198,6 @@ println("N: ", N)
 println("D: ", D)
 println("K_max: ", K_max)
 println("Kn: ", Kn)
-if !true_dataset println("qz: ", qz) end
 
 println("--------- computation times ----------")
 println("q_pr ", q_pr_time)
