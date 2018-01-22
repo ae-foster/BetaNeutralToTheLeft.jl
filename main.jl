@@ -1,5 +1,4 @@
 using ProgressMeter
-using Distributions
 include("dirichlet_multinomial.jl")
 include("estimators.jl")
 
@@ -60,7 +59,6 @@ Sprod = ones(Float64, K_max) # for efficiently computing E[K_{n-1}]
 # Only updated when using qzn_estimator_method == 3 # Monte Carlo
 M = 50
 nk_stats = zeros(Int, M, K_max)
-T_Kprev = zeros(Int, M)
 
 # Threshold for new cluster
 epsilon = max(alpha, 1e-5)
@@ -104,7 +102,7 @@ for n = 2:N
         log_qzn_pr = log(1-a) + qzn_pr_estimator_1(S_n, n, alpha)
         log_qzn_pr_new = log(a)
     elseif qzn_estimator_method == 3
-        nk_stats,T_Kprev,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,1:K_max]), nk_stats, T_Kprev, M, n, K_max, a, alpha, a_prime, b_prime)
+        nk_stats,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,1:K_max]), nk_stats, M, n, K_max, alpha, a_prime, b_prime)
     else
         error("Currently unsupported")
     end
@@ -177,7 +175,6 @@ for n = 2:N
     end
 
     # Update Kn using probabilities
-    new_cluster_p = exp(log_new_cluster_prob)
     Kn = acc_loss + sum(min.(S_n, 1))
 
     s_n_time += toq()
