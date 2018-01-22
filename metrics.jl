@@ -13,7 +13,7 @@ function compute_clustering_quality(z, qz)
     c = convert(Matrix{Int32}, z_hashed .== z_hashed')
     c_approx = qz * qz'
 
-   return sum(sum(abs.(c - c_approx)))
+   return mean(abs.(c - c_approx))
 end
 
 # predictive log-likelihood ??
