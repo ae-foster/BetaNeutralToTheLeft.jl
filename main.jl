@@ -47,7 +47,7 @@ qtheta = zeros(Float64, D, K_max)
 # MLE for this hyperparameter is 1e-2
 dir_prior_param = 1e-2 * ones(Float64, D)
 a_prime_prior = 1; b_prime_prior = 1 # Beta prior on geometric parameter
-alpha = 0.1 # Neutral to the left parameter
+alpha = 0.4 # Neutral to the left parameter
 
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
@@ -57,7 +57,7 @@ qzn_estimator_method = 1
 Sprod = ones(Float64, K_max) # for efficiently computing E[K_{n-1}]
 
 # Only updated when using qzn_estimator_method == 3 # Monte Carlo
-M = 50
+M = 500
 nk_stats = zeros(Int, M, K_max)
 
 # Threshold for new cluster
@@ -102,7 +102,7 @@ for n = 2:N
         log_qzn_pr = log(1-a) + qzn_pr_estimator_1(S_n, n, alpha)
         log_qzn_pr_new = log(a)
     elseif qzn_estimator_method == 3
-        nk_stats,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,1:K_max]), nk_stats, M, n, K_max, alpha, a_prime, b_prime)
+        nk_stats,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,1:K_max]), nk_stats, M, n, K_max, alpha, a_prime_prior, b_prime_prior)
     else
         error("Currently unsupported")
     end
@@ -205,7 +205,6 @@ println("N: ", N)
 println("D: ", D)
 println("K_max: ", K_max)
 println("Kn: ", Kn)
-println("qz: ", qz[1:10,1:10])
 if !true_dataset println("qz: ", qz) end
 
 println("--------- computation times ----------")
