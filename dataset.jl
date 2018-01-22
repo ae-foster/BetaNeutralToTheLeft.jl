@@ -1,6 +1,7 @@
 using JSON
 using DataStructures
 using TextAnalysis # Pkg.checkout("TextAnalysis")
+using Distributions
 
 function prepare2!(crps::Corpus, flags::UInt32; skip_patterns = Set{AbstractString}(), skip_words = Set{AbstractString}())
     ((flags & strip_sparse_terms) > 0) && union!(skip_words, sparse_terms(crps))
@@ -58,4 +59,30 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
     m = DocumentTermMatrix(crps)
     # m = tf_idf(m)
     z, dtm(m)
+end
+
+function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Vector)
+    @assert length(alpha) == D
+    z = zeros(Int, N)
+    X = zeros(Int, N, D)
+    Ts = [1]
+    while Ts[end] < N
+        geo = rand(Geometric(a)) + 1
+        T = Int(Ts[end]) + rand(Geometric(a))
+        push!(Ts, T)
+    end
+    K = 1
+    theta = rand(Dirichlet(alpha))
+    for n in 1:N
+        println("Ts[K]: ", Ts[K])
+        if Ts[K] == n
+            K += 1
+            theta = rand(Dirichlet(alpha))
+        end
+        z[n] = K
+        X[n, :] = rand(Multinomial(n_x, theta))
+    end
+
+    perm = randperm(N)
+    return z[perm], X[perm, :]
 end
