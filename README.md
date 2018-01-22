@@ -2,6 +2,16 @@
 
 For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnxq
 
+## TODO
+
+- Make it scale
+ - Why global parameter update is slow ??
+ - Preallocate matrices ?
+ - Faster log likelihood of Dirichlet-Multinomial distribution ?
+- Mean field + taylor expension (1st order) approximation, for model with prior on Geometric parameter
+- 2nd order Taylor expension ?
+- predictive log-likelihood metric ?
+
 ## Data
 
 Obtain training data as follows
