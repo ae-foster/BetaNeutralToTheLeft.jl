@@ -6,6 +6,12 @@ include("estimators.jl")
 true_dataset = true
 debug = false
 
+function print_debug(args...)
+    if debug == true
+        println(args...)
+    end
+end
+
 if true_dataset # Data from source
     include("dataset.jl")
     filename = "./reviews.json"
@@ -29,7 +35,10 @@ end
 
 # K_max = Number of clusters allocated
 K_max = 1
-K_max_alloc = 200 # preallocate matrices
+# K_n = Expected number of occupied  clusters
+Kn = 1
+# Accumulate probability 'lost' to uninstantiated clusters
+acc_loss = 0
 # qz[i, :] represents the log probability that observation i is attribuetd to cluster k
 log_qz = -Inf*ones(Float64, N, K_max)
 # qtheta[:, k] represent the parameter (usually called alpha) of a Dirichlet for cluster k
@@ -38,8 +47,8 @@ qtheta = zeros(Float64, D, K_max)
 # Prior (hyper)parameters
 # MLE for this hyperparameter is 1e-2
 dir_prior_param = 1e-2 * ones(Float64, D)
-a_prime = 1; b_prime = 1; # Beta prior on geometric parameter
-alpha = 0.5 # Neutral to the left parameter
+a_prime_prior = 1; b_prime_prior = 1 # Beta prior on geometric parameter
+alpha = 0.1 # Neutral to the left parameter
 
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
@@ -54,19 +63,14 @@ nk_stats = zeros(Int, M, K_max)
 T_Kprev = zeros(Int, M)
 
 # Threshold for new cluster
-epsilon = 0.1
+epsilon = max(alpha, 1e-5)
 
 # Initialization <=> First iteration
 p = Progress(N, .5, "Observation n°: ", 50)
 log_qz[1, 1] = 0 # Initialize first data point
 qtheta[:, 1] = dir_prior_param + X[1, :] # Initialize qtheta posterior given x_1
 
-function print_debug(args...)
-    if debug == true
-        println(args...)
-    end
-end
-
+# Timings
 q_pr_time = 0
 dir_n_time = 0
 dir_new_time = 0
@@ -79,6 +83,7 @@ for n = 2:N
     ProgressMeter.update!(p, n)
     print_debug("n: ", n)
     print_debug("K_max: ", K_max)
+    print_debug("Kn: ", Kn)
 
     # Exclude empty documents: they cause NaNs
     if sum(X[n, :]) == 0
@@ -94,8 +99,9 @@ for n = 2:N
     # end
     tic()
     if qzn_estimator_method == 1
-        a = a_prime / (a_prime + b_prime)
-        log_qzn_pr = log(1-a) + qzn_pr_estimator_1(S_n, n, K_max, alpha)
+        # Expectation of Beta(1 + K_n, n -1 - K_n)
+        a = (a_prime_prior + Kn - 1) / (a_prime_prior + b_prime_prior + n - 2)
+        log_qzn_pr = log(1-a) + qzn_pr_estimator_1(S_n, n, alpha)
         log_qzn_pr_new = log(a)
     elseif qzn_estimator_method == 3
         nk_stats,T_Kprev,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(exp.(log_qz[n-1,1:K_max]), nk_stats, T_Kprev, M, n, K_max, a, alpha, a_prime, b_prime)
@@ -148,10 +154,10 @@ for n = 2:N
         if qzn_estimator_method < 3 push!(S_n, 0) end
         if qzn_estimator_method == 2 push!(Sprod, 1) end
         if qzn_estimator_method == 3 nk_stats = hcat(nk_stats, zeros(Float64, M)) end
-        a_prime += 1
     else
-        b_prime += 1
+        acc_loss += exp(log_new_cluster_prob)
     end
+
     new_cluster_time += toq()
     tic()
 
@@ -169,6 +175,10 @@ for n = 2:N
     if qzn_estimator_method < 3
         S_n += qzn
     end
+
+    # Update Kn using probabilities
+    new_cluster_p = exp(log_new_cluster_prob)
+    Kn = acc_loss + sum(min.(S_n, 1))
 
     s_n_time += toq()
     tic()
@@ -197,8 +207,8 @@ qz = exp.(log_qz)
 println("N: ", N)
 println("D: ", D)
 println("K_max: ", K_max)
+println("Kn: ", Kn)
 println("qz: ", qz[1:10,1:10])
-println("a_prime: ", a_prime, ", b_prime: ", b_prime)
 if !true_dataset println("qz: ", qz) end
 
 println("--------- computation times ----------")

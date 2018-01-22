@@ -1,4 +1,4 @@
-function qzn_pr_estimator_1(S_n::Vector, n::Int, K_max::Int, alpha::Float64)
+function qzn_pr_estimator_1(S_n::Vector, n::Int, alpha::Float64)
     unnormalized = max.((S_n - alpha),0)
     lp = log.(unnormalized ./ sum(unnormalized))
     return lp
