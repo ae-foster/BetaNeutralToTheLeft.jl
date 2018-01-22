@@ -38,7 +38,8 @@ log_qz = -Inf*ones(Float64, N, K_max)
 qtheta = zeros(Float64, D, K_max)
 
 # Prior (hyper)parameters
-dir_prior_param = 0.0005 * ones(Float64, D)
+# MLE for this hyperparameter is 1e-2
+dir_prior_param = 1e-2 * ones(Float64, D)
 a_prime = 1; b_prime = 1; # Beta prior on geometric parameter
 alpha = 0.5 # Neutral to the left parameter
 
