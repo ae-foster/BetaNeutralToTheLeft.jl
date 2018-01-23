@@ -36,23 +36,35 @@ function qzn_pr_estimator_MC(qz_prev:: Vector, nk_stats::Matrix, M::Int, n::Int,
     nk_stats, log.(qzn_pr[1:K_max]),  log(qzn_pr[K_max+1])
 end
 
-function qzn_pr_estimator_NRM(S_n::Vector, Sprod::Vector, n::Int, K_max::Int, a::Float64, tau::Float64, sigma::Float64)
-    log_qzn_pr = zeros(Float64, K_max + 1)
-    log_qzn_pr[1:K_max] = log(max.(S_n - sigma, 0))
+function qzn_pr_estimator_NRM(S_n::Vector, Sprod::Vector, Un_hat::Real, n::Int, K_max::Int, a::Real, tau::Real, sigma::Real)
+    # Compute q^PR(zn) for the NRM mixture model cf Tank et al. 2014
+    # a, tau and sigma are the NGGP's parameters
 
-    Kprev = (K_max - sum(Sprod))
-
-    log_q = (U) -> -a/tau*(U + tau)^sigma + (n-1)*log(U) -(n - 1 - a*Kprev)*log(U + tau)
-    grad_log_q = (U) -> -a/tau*(U + tau)^(sigma-1) + (n-1)/U -(n - 1 - a*Kprev)/(U + tau)
-    Un_hat = 0
-    last_log_q = log_q(Un_hat)
-    step_size = 0.1
-    while true
-        Un_hat += step_size * grad_log_q(Un_hat)
-        (abs(log_q(Un_hat) - last_log_q) < 0.01) && break
+    log_qzn_pr_prevs = log.(max.(S_n - sigma, 0)) # cf Alg 1
+    if sigma == 0 # DP
+        return log_qzn_pr_prevs, log(a), 1
     end
 
-    log_qzn_pr[K_max+1] = log(a) + sigma * log(Un_hat + tau)
+    Kprev = (K_max - sum(Sprod)) # E[K_{n-1}] under \hat{q}(z_{1:n-1})
 
-    return log_qzn_pr[1:K_max], log_qzn_pr[K_max+1]
+    # Compute argmax of q(U_{n-1}) by gradient ascent
+    log_q = (U) -> -a/tau*(U + tau)^sigma + (n-1)*log(U) -(n - 1 - a*Kprev)*log(U + tau)
+    grad_log_q = (U) -> -a/tau*(U + tau)^(sigma-1) + (n-1)/U -(n - 1 - a*Kprev)/(U + tau)
+
+    last_log_q = log_q(Un_hat)
+    step_size = 1.
+    i = 1
+    while true
+        Un_hat += step_size * grad_log_q(Un_hat)
+        new_log_q = log_q(Un_hat)
+        println("obj[",i,"]: ", new_log_q)
+        obj_diff = abs(new_log_q - last_log_q)
+        ((obj_diff < 0.1) || i >= 100) && break
+        last_log_q = new_log_q
+        i += 1
+    end
+
+    log_qzn_pr_new = log(a) + sigma * log(Un_hat + tau)
+
+    return log_qzn_pr_prevs, log_qzn_pr_new, Un_hat
 end
