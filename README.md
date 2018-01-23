@@ -3,7 +3,7 @@
 For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnxq
 
 ## TODO
-
+### Priority
  - [ ] Improved estimator for K_{n-1}
  - [ ] For positive alpha, epsilon = alpha. Accumulate discarded probability
  - [ ] Synthetic data with Gaussian emissions
@@ -16,10 +16,11 @@ For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnx
  - [ ] Case of negative alpha
  - [ ] Instantiate clusters randomly
  - [ ] Metrics for coclustering matrix
+ - [ ] predictive log-likelihood metric ?
 
+### Secondary
  - Preallocate matrices ?
  - (possible) Faster log likelihood of Dirichlet-Multinomial distribution ?
- - predictive log-likelihood metric ?
 
 ## Data
 
