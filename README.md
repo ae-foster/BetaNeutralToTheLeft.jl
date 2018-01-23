@@ -10,6 +10,7 @@ For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnx
  - [ ] Train on bigger Amazon data on ziz
  - [ ] Compare (synthetic Gaussian data) with a NRM model using Alex Tank's VI
  - Other estimates of q^pr
+   - [x] NRM model
    - [x] MC estimate
    - [ ] 1st order Taylor expansions
    - [ ] 2nd order Taylor expansions
