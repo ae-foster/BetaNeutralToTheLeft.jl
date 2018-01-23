@@ -17,24 +17,8 @@ function logp_dirichlet_multinomial(x::SparseVector{Int64}, alpha::Array{Float64
     n_x = sum(x)
     alpha_0 = sum(alpha, 1)
     mask = findnz(x)[1]
-    return log(n_x) + lbeta.(alpha_0, n_x) - sum(log(x[mask])) - sum(lbeta.(x[mask], alpha[mask, :]), 1)
-end
-
-function logp_dirichlet_multinomial(x::SparseVector{Int64}, alpha::Array{Float64,1})
-    """Compute the marginal probability of x given alpha, where X follows the
-    Dirichlet-multinomial distribution of parameter alpha.
-
-    # Arguments
-    - `x::SparseVector{Int64}`: the D-vector of observation counts for each bin
-    - `alpha::Array{Float64,1}`: a D-vector of the Dirichlet parameter
-
-    # Returns
-    A Float64 for the marginal log probability of x given alpha
-    """
-    n_x = sum(x)
-    alpha_0 = sum(alpha)
-    mask = findnz(x)[1]
-    return log(n_x) + lbeta(alpha_0, n_x) - sum(log(x[mask])) - sum(lbeta.(x[mask], alpha[mask]))
+    return log(n_x) + lbeta.(alpha_0, n_x) - sum(log(x[mask])) -
+            sum(lbeta.(x[mask], alpha[mask, :]), 1)
 end
 
 function logp_dirichlet_multinomial(x::AbstractArray{Int64,2}, alpha::Float64)
@@ -56,5 +40,13 @@ function logp_dirichlet_multinomial(x::AbstractArray{Int64,2}, alpha::Float64)
     alpha_0 = D*alpha
     x = vec(x)
     mask = findnz(x)[1]
-    return sum(log.(n_x)) + sum(lbeta.(alpha_0, n_x)) - sum(log.(x[mask])) - sum(lbeta.(x[mask], alpha))
+    return sum(log.(n_x)) + sum(lbeta.(alpha_0, n_x)) -
+            sum(log.(x[mask])) - sum(lbeta.(x[mask], alpha))
+end
+
+function update_dirichlet_parameters!(x::SparseVector{Int64},
+        p::Vector{Float64}, alpha::Array{Float64,2})
+    # BLAS.gemm!('N', 'T', 1.0, X[n, :], qzn, 1.0, qtheta)
+    mask = findnz(x)[1]
+    alpha[mask, :] += x[mask] .* p'
 end

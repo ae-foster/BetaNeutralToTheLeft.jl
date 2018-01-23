@@ -61,17 +61,17 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
     z, dtm(m)
 end
 
-function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Float64, dir_prior_param::Vector)
-    # N: number of observations/documents
-    # D: size of vocabulary
-    # n_x: number of word per document
-    # a: Geometric parameter for inter-arrival times
-    # alpha: Neutral to the left parameter
-    # dir_prior_param: Dirichlet's parameter
-    @assert length(dir_prior_param) == D
-
+function generateDataset(N::Int, D::Int, a::Float64, alpha::Float64,
+        cluster_creator::Function, emission::Function, etype::Type)
+    """
+    - `N`: number of observations/documents
+    - `D`: emission dimension
+    - `a`: Geometric parameter for inter-arrival times
+    - `cluster_creator`: function generating random clusters
+    - `emission`: function generating random emission given a cluster
+    """
     z = zeros(Int, N)
-    X = zeros(Int, N, D)
+    X = zeros(etype, N, D)
 
     # Sample arrival times
     T = 1
@@ -90,7 +90,7 @@ function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Float64, d
         if Ts[K] == n
             # Sample and assign to a new cluster
             K += 1
-            thetas[K, :] = rand(Dirichlet(dir_prior_param))
+            thetas[K, :] = cluster_creator()
             push!(nk, 0)
             z[n] = K
         else
@@ -99,8 +99,41 @@ function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Float64, d
             z[n] = wsample(1:K, w)
         end
         nk[z[n]] += 1
-        X[n, :] = rand(Multinomial(n_x, thetas[K, :]))
+        X[n, :] = emission(thetas[z[n], :])
     end
 
+    return z, X
+end
+
+function generateDirDataset(N::Int, D::Int, n_x::Int, a::Float64,
+        alpha::Float64, dir_prior_param::Vector)
+    # N: number of observations/documents
+    # D: size of vocabulary
+    # n_x: number of word per document
+    # a: Geometric parameter for inter-arrival times
+    # alpha: Neutral to the left parameter
+    # dir_prior_param: Dirichlet's parameter
+    @assert length(dir_prior_param) == D
+
+    cluster_creator = () -> rand(Dirichlet(dir_prior_param))
+    emission = (cluster) -> rand(Multinomial(n_x, cluster))
+
+    z, X = generateDataset(N, D, a, alpha, cluster_creator, emission, Int)
+
     return z, sparse(X)
+end
+
+function generateGaussianDataset(N::Int, D::Int, a::Float64, alpha::Float64,
+        sigma2::Float64, sigma2_observe::Float64)
+    # N: number of observations/documents
+    # D: size of vocabulary
+    # a: Geometric parameter for inter-arrival times
+    # alpha: Neutral to the left parameter
+    # sigma: Std deviation of cluster creation
+    # sigma_observe: Std deviation of emission
+
+    cluster_creator = () -> rand(MvNormal(zeros(D), eye(D)*sigma2))
+    emission = (cluster) -> rand(MvNormal(cluster, eye(D)*sigma2_observe))
+
+    return generateDataset(N, D, a, alpha, cluster_creator, emission, Float64)
 end

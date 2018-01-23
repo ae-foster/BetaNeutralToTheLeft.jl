@@ -1,5 +1,4 @@
 using ProgressMeter
-include("dirichlet_multinomial.jl")
 include("estimators.jl")
 include("dataset.jl")
 
@@ -19,14 +18,14 @@ end
 # Data
 ##############################################################################
 
-true_dataset = false
+true_dataset = true
 
 if true_dataset # Data from source
     filename = "./reviews.json"
     z, X = getDocumentTermMatrixFromReviewsJson(filename)
 else # Synthetic data
     println("Synthesising data")
-    z, X = generateDataset(1000, 1000, 30, .5, 0.5, 0.1*ones(1000))
+    z, X = generateGaussianDataset(1000, 2, .5, 0.5, 10.0, 1e-4)
     println("Done")
 end
 N, D = size(X)
@@ -41,21 +40,53 @@ K_max = 1
 Kn = 1
 # qz[i, :] represents the log probability that observation i is attribuetd to cluster k
 log_qz = -Inf*ones(Float64, N, K_max)
-# qtheta[:, k] represent the parameter (usually called alpha) of a Dirichlet for cluster k
-qtheta = zeros(Float64, D, K_max)
 
-# Prior (hyper)parameters
-# If using Amazon musical instruments, MLE for this hyperparameter is 1e-2
-dir_prior_param = 1e-1 * ones(Float64, D)
 # Beta prior on geometric parameter
 a_prime_prior = 1; b_prime_prior = 1
  # Neutral to the left parameter
-alpha = 0.5
+alpha = 0.0
 
 # Threshold for new cluster
 epsilon = max(alpha, 1e-5)
 # Accumulate probability 'lost' to uninstantiated clusters
 acc_loss = 0
+
+###########################################################################
+# Emission specific parameters
+###########################################################################
+emission = "dirichlet"
+
+if emission == "dirichlet"
+    include("dirichlet_multinomial.jl")
+    # Function calculating logp
+    logp_emission = logp_dirichlet_multinomial
+    # Function updating parameters
+    update_params! = update_dirichlet_parameters!
+
+    # qtheta[1][:, k] represent the parameter (usually called alpha) of a Dirichlet for cluster k
+    qtheta = (1e-2 * ones(Float64, D, K_max), )
+
+    # Prior (hyper)parameters
+    # If using Amazon musical instruments, MLE for this hyperparameter is 1e-2
+    theta_prior = (1e-2 * ones(Float64, D), )
+
+    # Control parameters: only relevant for Gaussian
+    control_params = Tuple([])
+elseif emission == "gaussian"
+    include("gaussian.jl")
+    logp_emission = logp_gaussian
+    update_params! = update_gaussian_parameters!
+
+    qtheta = (zeros(Float64, D, K_max), 1e-2 * ones(Float64, K_max))
+    theta_prior = (zeros(Float64, D), 1e-2 * ones(Float64, K_max))
+    control_params = (1e4, )
+end
+
+
+function adjoin(base::Tuple, addition::Tuple)
+    return Tuple(if (ndims(b) > 1) hcat(b, a) else vcat(b, a) end
+                 for (b, a) in zip(base, addition))
+end
 
 ############################################################################
 # Implementation specific data structures
@@ -78,8 +109,7 @@ nk_stats = zeros(Int, M, K_max)
 # Timings
 ############################################################################
 q_pr_time = 0
-dir_n_time = 0
-dir_new_time = 0
+logp_time = 0
 new_cluster_time = 0
 s_n_time = 0
 qtheta_time = 0
@@ -92,8 +122,9 @@ qtheta_time = 0
 p = Progress(N, .5, "Observation n°: ", 50)
 
 # Put first data point in the first cluster
-log_qz[1, 1] = 0 # Initialize first data point
-qtheta[:, 1] = dir_prior_param + X[1, :] # Initialize qtheta posterior given x_1
+log_qz[1, 1] = 0 # Initialize probability
+# Initialize qtheta posterior given x_1
+update_params!(X[1, :], exp.(log_qz[1, :]), qtheta..., control_params...)
 
 #############################################################################
 # Iteration n>1
@@ -136,27 +167,22 @@ for n = 2:N
 
     # Second projection: Use marginalization of conjugate exp fam
     # i.e. substraction in parameter space
-    log_qz[n,:] = log_qzn_pr + logp_dirichlet_multinomial(X[n, :], qtheta)'
+    likelihood = logp_emission(X[n, :], adjoin(qtheta, theta_prior)...)
+
+    log_qz[n,:] = log_qzn_pr + likelihood[1:K_max]
+    log_qzn_new = log_qzn_pr_new + likelihood[K_max + 1]
 
     # Check for NaN in log_qz[n, :]
     if any(isnan, log_qz[n,:])
-        print_debug(X[n, :])X[n, :] .* qzn'
+        print_debug(X[n, :])
         print_debug(qtheta)
         error("NaN encountered in logp_dirichlet computation")
     end
 
-    # Timings
-    dir_n_time += toq()
-    tic()
-
-    # New cluster probability
-    log_qzn_new = log_qzn_pr_new + logp_dirichlet_multinomial(
-        X[n, :], dir_prior_param)
-
-    # Debug info, timing
+    # Debug, timing
     print_debug("log_qz[n,:] ", log_qz[n,:])
     print_debug("log_qzn_new ", log_qzn_new)
-    dir_new_time += toq()
+    logp_time += toq()
     tic()
 
     # Use log-sum-exp trick to normalize
@@ -176,7 +202,7 @@ for n = 2:N
 
         # Increase the size of arrays to hold new cluster
         K_max += 1
-        qtheta = hcat(qtheta, dir_prior_param)
+        qtheta = adjoin(qtheta, theta_prior)
         log_qz = hcat(log_qz, -Inf*ones(Float64, N, 1))
         log_qz[n, K_max] = log_qzn_new
 
@@ -224,11 +250,8 @@ for n = 2:N
     s_n_time += toq()
     tic()
 
-
     # Update qtheta approximately using current assignment probabilities
-    # BLAS.gemm!('N', 'T', 1.0, X[n, :], qzn, 1.0, qtheta)
-    mask = findnz(X[n, :])[1]
-    qtheta[mask, :] += X[n, mask] .* qzn'
+    update_params!(X[n, :], qzn, qtheta..., control_params...)
 
     # Update the timer
     qtheta_time += toq()
@@ -246,8 +269,7 @@ println("Kn: ", Kn)
 
 println("--------- computation times ----------")
 println("q_pr ", q_pr_time)
-println("dir_n ", dir_n_time)
-println("dir_new ", dir_new_time)
+println("logp ", logp_time)
 println("new cluster ", new_cluster_time)
 println("s_n ", s_n_time)
 println("qtheta ", qtheta_time)
