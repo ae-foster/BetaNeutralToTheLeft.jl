@@ -102,5 +102,5 @@ function generateDataset(N::Int, D::Int, n_x::Int, a::Float64, alpha::Float64, d
         X[n, :] = rand(Multinomial(n_x, thetas[K, :]))
     end
 
-    return z, X
+    return z, sparse(X)
 end

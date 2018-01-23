@@ -1,7 +1,16 @@
-function qzn_pr_estimator_1(S_n::Vector, n::Int, alpha::Float64)
+function qzn_pr_estimator_1(n::Int, Kn::Real, alpha::Float64,
+        a_prime_prior::Real, b_prime_prior::Real, S_n::Vector)
+
+    # Expectation of Beta(1 + K_n, n -1 - K_n)
+    a = (a_prime_prior + Kn - 1) / (a_prime_prior + b_prime_prior + n - 2)
+
     unnormalized = max.((S_n - alpha),0)
     lp = log.(unnormalized ./ sum(unnormalized))
-    return lp
+
+    log_qzn_pr = log(1-a) + lp
+    log_qzn_pr_new = log(a)
+
+    return log_qzn_pr, log_qzn_pr_new
 end
 
 function qzn_pr_estimator_2(S_n::Vector, Sprod::Vector, n::Int, K_max::Int, a::Float64, alpha::Float64)
