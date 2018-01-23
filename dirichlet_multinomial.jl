@@ -21,6 +21,11 @@ function logp_dirichlet_multinomial(x::SparseVector{Int64}, alpha::Array{Float64
             sum(lbeta.(x[mask], alpha[mask, :]), 1)
 end
 
+function logp_dirichlet_multinomial(x::SparseVector{Int64}, alpha::Array{Float64,1})
+    alpha = reshape(alpha, (size(alpha)..., 1))
+    return logp_dirichlet_multinomial(x, alpha)[1]
+end
+
 function logp_dirichlet_multinomial(x::AbstractArray{Int64,2}, alpha::Float64)
     """Compute the marginal probability of x given alpha, where X follows the
     Dirichlet-multinomial distribution of parameter alpha.

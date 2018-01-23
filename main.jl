@@ -167,10 +167,11 @@ for n = 2:N
 
     # Second projection: Use marginalization of conjugate exp fam
     # i.e. substraction in parameter space
-    likelihood = logp_emission(X[n, :], adjoin(qtheta, theta_prior)...)
+    likelihood = logp_emission(X[n, :], qtheta...)
+    likelihood_new = logp_emission(X[n, :], theta_prior...)
 
     log_qz[n,:] = log_qzn_pr + likelihood[1:K_max]
-    log_qzn_new = log_qzn_pr_new + likelihood[K_max + 1]
+    log_qzn_new = log_qzn_pr_new + likelihood_new
 
     # Check for NaN in log_qz[n, :]
     if any(isnan, log_qz[n,:])

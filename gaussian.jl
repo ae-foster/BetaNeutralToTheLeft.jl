@@ -22,6 +22,12 @@ function logp_gaussian(x::Vector{Float64}, m::Array{Float64,2},
     return (d/2)log.(tau) - (tau/2) .* dots
 end
 
+function logp_gaussian(x::Vector{Float64}, m::Array{Float64,1},
+        tau::Array{Float64,1})
+    m = reshape(m, (size(m)..., 1))
+    return logp_gaussian(x, m, tau)[1]
+end
+
 function update_gaussian_parameters!(x::Vector{Float64}, p::Vector{Float64},
         m::Array{Float64,2}, tau::Vector{Float64}, observe_tau::Float64)
     outer = x .* p'
