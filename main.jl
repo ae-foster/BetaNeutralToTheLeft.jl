@@ -65,8 +65,9 @@ acc_loss = 0
 qzn_estimator_method = 1
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
-# Only updated when using qzn_estimator_method == 2
+# Only updated when using qzn_estimator_method == 2 # NRM
 Sprod = ones(Float64, K_max) # for efficiently computing E[K_{n-1}]
+Un_hat = 1
 
 # Only updated when using qzn_estimator_method == 3 # Monte Carlo
 M = 500
@@ -107,7 +108,6 @@ for n = 2:N
     print_debug("K_max: ", K_max)
     print_debug("Kn: ", Kn)
     tic()
-
     # Skip empty documents: they cause NaNs
     if sum(X[n, :]) == 0
         continue
@@ -122,6 +122,8 @@ for n = 2:N
         nk_stats,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(
             exp.(log_qz[n-1,1:K_max]), nk_stats, M, n, K_max, alpha,
             a_prime_prior, b_prime_prior)
+    elseif qzn_estimator_method == 2
+        log_qzn_pr, log_qzn_pr_new, Un_hat = qzn_pr_estimator_NRM(S_n, Sprod, Un_hat, n, K_max, 1, 1000, 0.5)
     else
         error("Currently unsupported")
     end
