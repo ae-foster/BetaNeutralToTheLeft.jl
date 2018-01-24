@@ -15,6 +15,8 @@
 
 * http://data.numenta.org/index.html
 * *EARTHQUAKES!* https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson_detail.php, https://earthquake.usgs.gov/earthquakes/feed/v1.0/csv.php, https://earthquake.usgs.gov/
+  * background: https://earth.usc.edu/~ybz/pubs_recent/Yuen_etal_09/Yuen_etal_09.pdf
+  
 
 ## Temporal Networks
 * https://snap.stanford.edu/data/#temporal
