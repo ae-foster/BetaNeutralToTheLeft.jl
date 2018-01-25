@@ -1,6 +1,7 @@
 using ProgressMeter
 include("estimators.jl")
 include("dataset.jl")
+include("metrics.jl")
 
 ##############################################################################
 # Debugging
@@ -158,6 +159,15 @@ for n = 2:N
     else
         error("Currently unsupported")
     end
+    # Compute "predictive" log-likelihood
+    offset = max.(log_qzn_pr, log_qzn_pr_new)[1]
+    log_qzn_pr -= offset
+    log_qzn_pr_new -= offset
+    log_qzn_pr_new_prob = log_qzn_pr_new - log(exp(log_qzn_pr_new) + sum(exp.(log_qzn_pr)))
+    log_qzn_pr_prob = log_qzn_pr - log(exp(log_qzn_pr_new) + sum(exp.(log_qzn_pr)))
+    println(loglikelihood(logp_emission, X[n, :], log_qzn_pr_prob, log_qzn_pr_new_prob, qtheta, theta_prior, K_max))
+
+    # Check for NaN in log_qz[n, :]
 
     # Debug info, timing
     print_debug("log_qzn_pr ", log_qzn_pr)
@@ -276,7 +286,6 @@ println("s_n ", s_n_time)
 println("qtheta ", qtheta_time)
 
 # Compute metrics of the approximate posterior distribution
-include("metrics.jl")
 qz = exp.(log_qz)
 true_nb_clusters, approx_nb_cluster = compare_nb_clusters(z, qz)
 println("true_no_clusters ", true_nb_clusters)
