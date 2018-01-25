@@ -22,6 +22,10 @@ For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnx
 ### Secondary
  - Preallocate matrices ?
  - (possible) Faster log likelihood of Dirichlet-Multinomial distribution ?
+ 
+### Ben
+ - [ ] Gibbs sampler for partition- and graph-valued data
+ - [ ] Gibbs sampler for mixture model
 
 ## Data
 
