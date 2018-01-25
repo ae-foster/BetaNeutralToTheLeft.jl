@@ -4,6 +4,7 @@ function qzn_pr_estimator_1(n::Int, Kn::Real, alpha::Float64,
     # Expectation of Beta(1 + K_n, n -1 - K_n)
     a = (a_prime_prior + Kn - 1) / (a_prime_prior + b_prime_prior + n - 2)
 
+    # Using K_n here is pointless- we renormalize away any denominator anyway
     unnormalized = max.((S_n - alpha),0)
     lp = log.(unnormalized ./ sum(unnormalized))
 
@@ -11,10 +12,6 @@ function qzn_pr_estimator_1(n::Int, Kn::Real, alpha::Float64,
     log_qzn_pr_new = log(a)
 
     return log_qzn_pr, log_qzn_pr_new
-end
-
-function qzn_pr_estimator_2(S_n::Vector, Sprod::Vector, n::Int, K_max::Int, a::Float64, alpha::Float64)
-    (1 - a) * max((S_n - alpha),0) / (n - 1 - alpha*(K_max - sum(Sprod)))
 end
 
 function qzn_pr_estimator_MC(qz_prev:: Vector, nk_stats::Matrix, M::Int, n::Int, K_max::Int, alpha::Float64, a_prime::Real, b_prime::Real)

@@ -51,6 +51,8 @@ alpha = 0.0
 epsilon = max(alpha, 1e-5)
 # Accumulate probability 'lost' to uninstantiated clusters
 acc_loss = 0
+# Track predictive log-likelihood
+predictive_loglikelihood = zeros(Float64, N-1)
 
 ###########################################################################
 # Emission specific parameters
@@ -98,7 +100,7 @@ qzn_estimator_method = 1
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
 # Only updated when using qzn_estimator_method == 2 # NRM
-Sprod = ones(Float64, K_max) # for efficiently computing E[K_{n-1}]
+Sprod = ones(Float64, K_max-1) # for efficiently computing E[K_{n-1}]
 Un_hat = 1
 
 # Only updated when using qzn_estimator_method == 3 # Monte Carlo
@@ -159,15 +161,6 @@ for n = 2:N
     else
         error("Currently unsupported")
     end
-    # Compute "predictive" log-likelihood
-    offset = max.(log_qzn_pr, log_qzn_pr_new)[1]
-    log_qzn_pr -= offset
-    log_qzn_pr_new -= offset
-    log_qzn_pr_new_prob = log_qzn_pr_new - log(exp(log_qzn_pr_new) + sum(exp.(log_qzn_pr)))
-    log_qzn_pr_prob = log_qzn_pr - log(exp(log_qzn_pr_new) + sum(exp.(log_qzn_pr)))
-    println(loglikelihood(logp_emission, X[n, :], log_qzn_pr_prob, log_qzn_pr_new_prob, qtheta, theta_prior, K_max))
-
-    # Check for NaN in log_qz[n, :]
 
     # Debug info, timing
     print_debug("log_qzn_pr ", log_qzn_pr)
@@ -177,11 +170,11 @@ for n = 2:N
 
     # Second projection: Use marginalization of conjugate exp fam
     # i.e. substraction in parameter space
-    likelihood = logp_emission(X[n, :], qtheta...)
-    likelihood_new = logp_emission(X[n, :], theta_prior...)
+    llikelihood = logp_emission(X[n, :], qtheta...)
+    llikelihood_new = logp_emission(X[n, :], theta_prior...)
 
-    log_qz[n,:] = log_qzn_pr + likelihood[1:K_max]
-    log_qzn_new = log_qzn_pr_new + likelihood_new
+    log_qz[n,:] = log_qzn_pr + llikelihood[1:K_max]
+    log_qzn_new = log_qzn_pr_new + llikelihood_new
 
     # Check for NaN in log_qz[n, :]
     if any(isnan, log_qz[n,:])
@@ -201,8 +194,12 @@ for n = 2:N
     offset = max.(log_qz[n, :], log_qzn_new)[1]
     log_qz[n,:] -= offset
     log_qzn_new -= offset
-    log_new_cluster_prob = log_qzn_new -
-        log(exp(log_qzn_new) + sum(exp.(log_qz[n, :])))
+    normalizer = log(exp(log_qzn_new) + sum(exp.(log_qz[n, :])))
+    log_new_cluster_prob = log_qzn_new - normalizer
+
+    if predictive_loglikelihood != nothing
+        predictive_loglikelihood[n-1] = offset + normalizer
+    end
 
     # Should create a new cluster ?
     print_debug("log_new_cluster_prob: ", log_new_cluster_prob)
@@ -219,7 +216,7 @@ for n = 2:N
 
         # Update estimator-specific data structures
         if qzn_estimator_method < 3 push!(S_n, 0) end
-        if qzn_estimator_method == 2 push!(Sprod, 1) end
+        if qzn_estimator_method < 3 push!(Sprod, 1) end
         if qzn_estimator_method == 3
             nk_stats = hcat(nk_stats, zeros(Float64, M))
         end
@@ -240,20 +237,9 @@ for n = 2:N
     # sufficient stats for expectation of n_k
     if qzn_estimator_method < 3
         S_n += qzn
-    end
-
-    # Update Kn using probabilities
-    if qzn_estimator_method == 1
-        Kn = acc_loss + sum(min.(S_n, 1))
-    end
-
-    if qzn_estimator_method == 2
-        Scdf = 0
-        for k = 1:K_max
-            # Sufficient stats for expectation of Kn
-            Scdf += exp(log_qz[n, k])
-            Sprod[k] *= Scdf
-        end
+        Sprod = Sprod .* cumsum(qzn[1:(K_max-1)])
+        Kn = acc_loss + K_max - sum(Sprod)
+        #Kn = acc_loss + sum(min.(S_n, 1))
     end
 
     # Debug info, timings
