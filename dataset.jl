@@ -61,12 +61,96 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
     z, dtm(m)
 end
 
+function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::DiscreteDistribution)
+    """
+    - `TK`: 'T' if `N` is the total number of observations;
+        'K' if `N` is the total number of arrivals
+    - `N`: number of arrival times to generate (modulated by `TK`)
+    - `interarrival`: distribution object to generate i.i.d. interarrivals
+    """
+
+    # check function arguments
+    TK != 'K' && TK != 'T' ? error("`TK` must be 'T' or 'K'") : nothing
+
+    zero_shift = Int(minimum(interarrival_dist) == 0)
+
+    if TK == 'K'
+      ia = rand(interarrival_dist, N) + zero_shift
+      unshift!(ia,1)
+      T = cumsum(ia)
+      return T
+    else
+      m = mean(interarrival_dist)
+      n_0 = Int(ceil(N/m))
+      ia = rand(interarrival_dist, n_0) + zero_shift
+      unshift!(ia,1)
+      T = cumsum(ia)
+      full_check = (T .<= N)
+
+      if sum(full_check) < n_0
+        T = T[full_check]
+        return T
+      else
+        s = T[end]
+        while s < N
+          s_plus = rand(interarrival_dist) + zero_shift + s
+          s_plus <= N ? push!(T,s_plus) : nothing
+          s = s_plus
+        end
+        return T
+      end
+    end
+
+end
+
+function generateLabelSequence(N::Int, alpha::Float64,
+        interarrival_dist::DiscreteDistribution)
+    """
+    - `N`: number of observations in the sequence
+    - `alpha`: 'discount parameter' in size-biased reinforcement
+    - `interarrival_dist`: distribution object to generate i.i.d. interarrivals
+    """
+    Z = zeros(Int, N) # sequence of labels
+    T = generateInterarrivalTimes('T', N, interarrival_dist)
+    K = size(T,1) # number of clusters
+    PP = zeros(Int, K) # arrival-ordered partition counts
+
+    k = 0
+    for n in 1:N
+      if n <= T[end] && n == T[k+1]
+        k += 1
+        PP[k] = 1
+        Z[n] = k
+        k > K ? k = K : nothing
+      else
+        Z[n] = wsample(1:k, PP[1:k] .- alpha) # discounted size-biased sample
+        PP[Z[n]] += 1
+      end
+    end
+    return Z, PP, T
+end
+
+function generatePsis(T::Vector{Int},alpha::Float64)
+    """
+    - `T`: Arrival times
+    - `alpha`: 'discount' parameter
+    """
+    K = size(T,1)
+    Psi = zeros(Float64,K)
+    Psi[1] = 1
+    for j in 2:K
+      Psi[j] = rand(Beta(1 - alpha, T[j] - 1 - (j-1)*alpha))
+    end
+    return Psi
+end
+
 function generateDataset(N::Int, D::Int, a::Float64, alpha::Float64,
         cluster_creator::Function, emission::Function, etype::Type)
     """
     - `N`: number of observations/documents
     - `D`: emission dimension
     - `a`: Geometric parameter for inter-arrival times
+    - `alpha`: 'discount parameter' in size-biased reinforcement
     - `cluster_creator`: function generating random clusters
     - `emission`: function generating random emission given a cluster
     """
