@@ -34,3 +34,10 @@ function gaussian_scatters(X, z, qz)
     Plots.gui()
 
 end
+
+function pll_plot(tseries)
+
+    Plots.plot(tseries)
+    Plots.gui()
+
+end

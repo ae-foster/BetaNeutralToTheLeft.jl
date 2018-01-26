@@ -288,3 +288,9 @@ if plot_scatter
     include("plot_utils.jl")
     gaussian_scatters(X, z, qz)
 end
+
+plot_pll = true
+if plot_pll
+    include("plot_utils.jl")
+    pll_plot(predictive_loglikelihood)
+end
