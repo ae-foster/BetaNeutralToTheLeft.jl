@@ -96,7 +96,7 @@ end
 ############################################################################
 
 # Method for estimating qz
-qzn_estimator_method = 1
+qzn_estimator_method = 4
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
 # Only updated when using qzn_estimator_method == 2 # NRM
@@ -106,7 +106,6 @@ Un_hat = 1
 # Only updated when using qzn_estimator_method == 3 # Monte Carlo
 M = 500
 nk_stats = zeros(Int, M, K_max)
-
 
 ############################################################################
 # Timings
@@ -152,12 +151,16 @@ for n = 2:N
     if qzn_estimator_method == 1
         log_qzn_pr, log_qzn_pr_new = qzn_pr_estimator_1(
             n, Kn, alpha, a_prime_prior, b_prime_prior, S_n)
+    elseif qzn_estimator_method == 2
+        log_qzn_pr, log_qzn_pr_new, Un_hat = qzn_pr_estimator_NRM(
+            S_n, Sprod, Un_hat, n, K_max, 1, 10, 0.5)
     elseif qzn_estimator_method == 3
         nk_stats,log_qzn_pr,log_qzn_pr_new = qzn_pr_estimator_MC(
             exp.(log_qz[n-1,1:K_max]), nk_stats, M, n, K_max, alpha,
             a_prime_prior, b_prime_prior)
-    elseif qzn_estimator_method == 2
-        log_qzn_pr, log_qzn_pr_new, Un_hat = qzn_pr_estimator_NRM(S_n, Sprod, Un_hat, n, K_max, 1, 1000, 0.5)
+    elseif qzn_estimator_method == 4
+        log_qzn_pr = -log(K_max+1)*ones(K_max)
+        log_qzn_pr_new = -log(K_max+1)
     else
         error("Currently unsupported")
     end
