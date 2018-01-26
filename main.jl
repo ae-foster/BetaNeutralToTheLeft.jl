@@ -19,14 +19,14 @@ end
 # Data
 ##############################################################################
 
-true_dataset = true
+true_dataset = false
 
 if true_dataset # Data from source
     filename = "./reviews.json"
     z, X = getDocumentTermMatrixFromReviewsJson(filename)
 else # Synthetic data
     println("Synthesising data")
-    z, X = generateGaussianDataset(1000, 2, .5, 0.5, 10.0, 1e-4)
+    z, X = generateGaussianDataset(250, 2, .5, 0.0, 100.0, 1.0)
     println("Done")
 end
 N, D = size(X)
@@ -57,7 +57,7 @@ predictive_loglikelihood = zeros(Float64, N-1)
 ###########################################################################
 # Emission specific parameters
 ###########################################################################
-emission = "dirichlet"
+emission = "gaussian"
 
 if emission == "dirichlet"
     include("dirichlet_multinomial.jl")
@@ -82,7 +82,7 @@ elseif emission == "gaussian"
 
     qtheta = (zeros(Float64, D, K_max), 1e-2 * ones(Float64, K_max))
     theta_prior = (zeros(Float64, D), 1e-2 * ones(Float64, K_max))
-    control_params = (1e4, )
+    control_params = (1.0, )
 end
 
 
@@ -237,7 +237,7 @@ for n = 2:N
     # sufficient stats for expectation of n_k
     if qzn_estimator_method < 3
         S_n += qzn
-        Sprod = Sprod .* cumsum(qzn[1:(K_max-1)])
+        Sprod = Sprod .* (1 - qzn[2:K_max])
         Kn = acc_loss + K_max - sum(Sprod)
         #Kn = acc_loss + sum(min.(S_n, 1))
     end
@@ -276,3 +276,15 @@ qz = exp.(log_qz)
 true_nb_clusters, approx_nb_cluster = compare_nb_clusters(z, qz)
 println("true_no_clusters ", true_nb_clusters)
 println("Cluster quality metric ", compute_clustering_quality(z, qz))
+
+plot_heatmap = true
+if plot_heatmap
+    include("plot_utils.jl")
+    z_qz_heatmap(z, qz)
+end
+
+plot_scatter = true
+if plot_scatter
+    include("plot_utils.jl")
+    gaussian_scatters(X, z, qz)
+end
