@@ -4,23 +4,31 @@ For accompanying overleaf file, see https://www.overleaf.com/13236006mvbvdwgpwnx
 
 ## TODO
 ### Priority
- - [ ] Improved estimator for K_{n-1}
- - [ ] For positive alpha, epsilon = alpha. Accumulate discarded probability
- - [ ] Synthetic data with Gaussian emissions
- - [ ] Train on bigger Amazon data on ziz
- - [ ] Compare (synthetic Gaussian data) with a NRM model using Alex Tank's VI
+ - [x] Improved estimator for K_{n-1}
+ - [x] For positive alpha, epsilon = alpha. Accumulate discarded probability
+ - [x] Synthetic data with Gaussian emissions
+ - [x] Compare (synthetic Gaussian data) with a NRM model using Alex Tank's VI
  - Other estimates of q^pr
    - [x] NRM model
    - [x] MC estimate
    - [ ] 1st order Taylor expansions
    - [ ] 2nd order Taylor expansions
- - [ ] Case of negative alpha
+ - [ ] Case of negative alpha (what does this mean?)
+ - [ ] Tune alpha using CV
  - [ ] Instantiate clusters randomly
  - [ ] Metrics for coclustering matrix
- - [ ] predictive log-likelihood metric ?
+ - [x] predictive log-likelihood metric
+ - [ ] Expectation propagation
+ - [x] Coclustering and Gaussian plots
+ 
+### Data sources
+ - [ ] Earthquake data
+ - [ ] Kaggle movies
+ - [ ] Malicious activities
 
 ### Secondary
- - Preallocate matrices ?
+ - [ ] Train on bigger Amazon data on ziz
+ - [ ] Preallocate matrices ?
  - (possible) Faster log likelihood of Dirichlet-Multinomial distribution ?
  
 ### Ben
