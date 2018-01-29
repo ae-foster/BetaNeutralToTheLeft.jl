@@ -10,7 +10,7 @@ function logp_gaussian(x::Vector{Float64}, m::Array{Float64,2},
 
     # Arguments
     - `x::Vector{Float64}`: the D-vector observation
-    - `m::Array{Float64,2}`: the K-by-D matrix of possible means
+    - `m::Array{Float64,2}`: the D-by-K matrix of possible means
     - `tau::Vector{Float64}`: the K-vector of possible precisions
 
     # Returns

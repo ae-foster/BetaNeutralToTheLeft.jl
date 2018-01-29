@@ -26,7 +26,7 @@ if true_dataset # Data from source
     z, X = getDocumentTermMatrixFromReviewsJson(filename)
 else # Synthetic data
     println("Synthesising data")
-    z, X = generateGaussianDataset(250, 2, .5, 0.0, 100.0, 1.0)
+    z, X = generateGaussianDataset(1000, 2, .5, 0.0, 100.0, 1.0)
     println("Done")
 end
 N, D = size(X)
@@ -96,7 +96,7 @@ end
 ############################################################################
 
 # Method for estimating qz
-qzn_estimator_method = 4
+qzn_estimator_method = 1
 # Partial sums for qz^pr
 S_n = ones(Float64, K_max) # for efficiently computing E[n_k]
 # Only updated when using qzn_estimator_method == 2 # NRM

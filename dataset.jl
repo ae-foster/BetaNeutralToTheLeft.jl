@@ -129,11 +129,11 @@ function generateGaussianDataset(N::Int, D::Int, a::Float64, alpha::Float64,
     # D: size of vocabulary
     # a: Geometric parameter for inter-arrival times
     # alpha: Neutral to the left parameter
-    # sigma: Std deviation of cluster creation
-    # sigma_observe: Std deviation of emission
+    # sigma: Variance of cluster creation
+    # sigma_observe: Variance of emission
 
-    cluster_creator = () -> rand(MvNormal(zeros(D), eye(D)*sigma2))
-    emission = (cluster) -> rand(MvNormal(cluster, eye(D)*sigma2_observe))
+    cluster_creator = () -> rand(MvNormal(zeros(D), sqrt(sigma2)))
+    emission = (cluster) -> rand(MvNormal(cluster, sqrt(sigma2_observe)))
 
     return generateDataset(N, D, a, alpha, cluster_creator, emission, Float64)
 end
