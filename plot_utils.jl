@@ -1,5 +1,4 @@
 using Plots
-using JLD
 include("metrics.jl")
 
 plotly()
@@ -29,7 +28,7 @@ function gaussian_scatters(X, z, qz)
     Plots.scatter(X[:, 1], X[:, 2], color=z, aspect_ratio=:equal)
     Plots.gui()
 
-    z_approx = map(x->ind2sub(qz, x)[1], findmax(qz, 2)[2])
+    z_approx = map(x->ind2sub(qz, x)[2], findmax(qz, 2)[2])
     Plots.scatter(X[:, 1], X[:, 2], color=z_approx, aspect_ratio=:equal)
     Plots.gui()
 
@@ -37,7 +36,13 @@ end
 
 function pll_plot(tseries)
 
-    Plots.plot(tseries)
+    Plots.plot(tseries[1, :])
+    Plots.gui()
+
+    Plots.plot(tseries[2, :])
+    Plots.gui()
+
+    Plots.scatter(tseries[1, :], tseries[2, :])
     Plots.gui()
 
 end

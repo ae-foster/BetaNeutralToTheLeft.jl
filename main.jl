@@ -4,10 +4,12 @@ include("dataset.jl")
 include("metrics.jl")
 
 ##############################################################################
-# Debugging
+# Debugging, output
 ##############################################################################
 
 debug = false
+show_results = true
+make_plots = true
 
 function print_debug(args...)
     if debug == true
@@ -26,7 +28,7 @@ if true_dataset # Data from source
     z, X = getDocumentTermMatrixFromReviewsJson(filename)
 else # Synthetic data
     println("Synthesising data")
-    z, X = generateGaussianDataset(1000, 2, .5, 0.0, 100.0, 1.0)
+    z, X = generateDriftingGaussian(200, 2, .5, 0.0, 100.0, 1.0, [1., 0.])
     println("Done")
 end
 N, D = size(X)
@@ -52,7 +54,7 @@ epsilon = max(alpha, 1e-5)
 # Accumulate probability 'lost' to uninstantiated clusters
 acc_loss = 0
 # Track predictive log-likelihood
-predictive_loglikelihood = zeros(Float64, N-1)
+predictive_loglikelihood = zeros(Float64, 2, N-1)
 
 ###########################################################################
 # Emission specific parameters
@@ -200,9 +202,8 @@ for n = 2:N
     normalizer = log(exp(log_qzn_new) + sum(exp.(log_qz[n, :])))
     log_new_cluster_prob = log_qzn_new - normalizer
 
-    if predictive_loglikelihood != nothing
-        predictive_loglikelihood[n-1] = offset + normalizer
-    end
+    predictive_loglikelihood[1, n-1] = offset + normalizer
+    predictive_loglikelihood[2, n-1] = offset + log_qzn_new
 
     # Should create a new cluster ?
     print_debug("log_new_cluster_prob: ", log_new_cluster_prob)
@@ -259,41 +260,41 @@ for n = 2:N
 end
 
 ###########################################################################
-# Display results, diagnostics
+# Display results, diagnostics, plots
 ###########################################################################
 
-println("N: ", N)
-println("D: ", D)
-println("K_max: ", K_max)
-println("Kn: ", Kn)
+if show_results
+    println("------------- summary ----------------")
+    println("N: ", N)
+    println("D: ", D)
+    println("K_max: ", K_max)
+    println("Kn: ", Kn)
 
-println("--------- computation times ----------")
-println("q_pr ", q_pr_time)
-println("logp ", logp_time)
-println("new cluster ", new_cluster_time)
-println("s_n ", s_n_time)
-println("qtheta ", qtheta_time)
+    println("--------- computation times ----------")
+    println("q_pr ", q_pr_time)
+    println("logp ", logp_time)
+    println("new cluster ", new_cluster_time)
+    println("s_n ", s_n_time)
+    println("qtheta ", qtheta_time)
 
-# Compute metrics of the approximate posterior distribution
-qz = exp.(log_qz)
-true_nb_clusters, approx_nb_cluster = compare_nb_clusters(z, qz)
-println("true_no_clusters ", true_nb_clusters)
-println("Cluster quality metric ", compute_clustering_quality(z, qz))
+    println("------------- metrics -----------------")
+    qz = exp.(log_qz)
+    true_nb_clusters, approx_nb_cluster = compare_nb_clusters(z, qz)
+    println("True #clusters ", true_nb_clusters)
+    println("Coclustering L1 ", coclustering_l1(z, qz))
+    println("Coclustering L1 baseline ",
+            coclustering_l1(z, Diagonal(ones(Int, N))))
+    # println("Mutual information ", mutual_information(z, qz, S_n))
+    # println("Mutual information baseline ",
+    #         mutual_information(z, Diagonal(ones(Int, N)), ones(Int, N)))
+    println("ARI ", adjusted_rand_score(z, qz, S_n))
+    println("ARI baseline ",
+            adjusted_rand_score(z, Diagonal(ones(Int, N)), ones(Int, N)))
+end
 
-plot_heatmap = true
-if plot_heatmap
+if make_plots
     include("plot_utils.jl")
     z_qz_heatmap(z, qz)
-end
-
-plot_scatter = true
-if plot_scatter
-    include("plot_utils.jl")
     gaussian_scatters(X, z, qz)
-end
-
-plot_pll = true
-if plot_pll
-    include("plot_utils.jl")
     pll_plot(predictive_loglikelihood)
 end
