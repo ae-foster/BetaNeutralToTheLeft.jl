@@ -37,3 +37,21 @@ function update_gaussian_parameters!(x::Vector{Float64}, p::Vector{Float64},
         tau[j] += observe_tau * p[j]
     end
 end
+
+function gaussian_mean_ss(x::Array{Float64,2}, z::Vector{Int})
+    K = size(unique(z),1)
+    d, n = size(x)
+    c_means = zeros(Float64,d,K)
+    for i in 1:n
+      c_means[:,z[i]] += x[:,i]
+    end
+    return c_means
+end
+
+function gaussian_mean_ss_update!(ss::Array{Float64,2},k::Int,x::Vector{Float64})
+  """
+  updates cluster mean for cluster k (pass `-x` for removal from cluster)
+  """
+  ss[k] += x
+  return ss
+end
