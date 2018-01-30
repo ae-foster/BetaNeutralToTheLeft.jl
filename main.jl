@@ -297,4 +297,5 @@ if make_plots
     z_qz_heatmap(z, qz)
     gaussian_scatters(X, z, qz)
     pll_plot(predictive_loglikelihood)
+    cluster_means_plot(emission, qtheta)
 end

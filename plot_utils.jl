@@ -46,3 +46,10 @@ function pll_plot(tseries)
     Plots.gui()
 
 end
+
+function cluster_means_plot(emission, qtheta)
+    if emission == "gaussian"
+        Plots.plot(sum(abs2, qtheta[1], 1)')
+        Plots.gui()
+    end
+end
