@@ -139,45 +139,64 @@ end
 # end
 
 # marginalize Psi version
-function update_label_sequence(Z::Vector{Int},theta::Array{Real},X::Array{Real},alpha::Float64,
-  ia_dist::DiscreteDistribution,emission_logp::Function,sample_cluster_param::Function)
+function update_z_pp_ss_t_cparams!(
+  Z::Vector{Int},
+  PP::Vector{Int},
+  SS::Vector{Int},
+  T::Vector{Int},
+  theta::Array{Float64},
+  X::Array{Float64},
+  alpha::Float64,
+  ia_dist::DiscreteDistribution,
+  update_sufficient_stats!::Function,
+  emission_logp::Function,
+  sample_cluster_param::Function)
     """
-    - `Z`: vector of labels corresponding to clusters/blocks in a partition (to be updated)
-    - `theta`: array of cluster parameters (for now, assumed to have one column per cluster)
+    - `Z`: vector of labels corresponding to clusters/blocks in a partition (from previous iteration, will be updated)
+    - `PP`: arrival-ordered partition block sizes (from previous iteration, will be updated)
+    - `SS`: arrival-ordered sufficient statistics per cluster (from previous iteration, will be updated)
+    - `theta`: array of cluster parameters (for now, assumed to have one column per cluster,
+        will also be updated as necessary (deletions and additions))
+    - `T`: arrival times (from previous iteration, will be updated)
     - `X`: array of data; rows correspond to elements of `Z`
     - `alpha`: 'discount' parameter
     - `ia_dist`: distribution object corresponding to i.i.d. interarrivals
     *** assumes fixed interarrival distribution
+    - `update_sufficient_stats`: function that updates cluster sufficient statistics by removing an observation
     - `emission_logp`: function that returns marginalized log-emission probability
         input arguments should be:
-        - `i`: the index of the current label being updated
-        - `X`: the data array
-        - the vector of row indices in `X` (corresponding to observations in a cluster) on which to operate
+        - `X_i`: the data corresponding to the current label being updated
+        - `n_k`: the number of observations currently assigned to the cluster being calculated
+        - `SS`: the sufficient statistics for the cluster being calculated
     - `sample_cluster_param`: function to generate parameters for new clusters
     """
 
     n = size(Z,1)
     zero_shift = Int(minimum(ia_dist) == 0)
     K_i = get_num_blocks(Z)
-    T = get_arrivals(Z)
-    PP = seq2part(Z)
-    Z_update = deepcopy(Z)
-    theta_update = deepcopy(theta)
+    # T = get_arrivals(Z)
+    # PP = seq2part(Z)
+    # Z_update = deepcopy(Z)
+    # theta_update = deepcopy(theta)
+
+    # compute sufficient statistics for each cluster
+    # SS = compute_sufficient_stats(X,Z)
 
     K_n = size(T,1)
 
     for i in 2:n # Z[1] = 1 w.p. 1
 
-      if PP[Z_update[i]]==1 # singleton (and therefore arrival time)
-        deleteat!(PP,Z_update[i])
+      if PP[Z[i]]==1 # singleton (and therefore arrival time)
+        deleteat!(PP,Z[i])
         deleteat!(T,K_i[i])
         K_i[i:end] += -1
         K_n += -1
-        theta_update = theta_update[:,setdiff(1:K_n,Z_update[i])]
+        cluster_rm!(theta,Z[i],K_n)
+        cluster_rm!(SS,Z[i],K_n)
 
       elseif T[K_i[i]]==i # arrival time but not singleton
         K = K_i[i]
-        new_arrival = i + findfirst(Z_update[(i+1):end].==Z_update[i]) # reset arrival time for Z[i]'s cluster
+        new_arrival = i + findfirst(Z[(i+1):end].==Z[i]) # reset arrival time for Z[i]'s cluster
         K_i[i:(new_arrival-1)] += -1 # decrement num_blocks for i <= j <= new_arrival
         # update arrival times
         insert_idx = findfirst(T .> new_arrival)
@@ -186,13 +205,16 @@ function update_label_sequence(Z::Vector{Int},theta::Array{Real},X::Array{Real},
         # update partition
         PP[K] += -1
         insert_idx > 0 ? cycle_elements_left!(PP,K,insert_idx-1) : cycle_elements_left!(PP,K,size(PP,1))
+        update_sufficient_stats!(SS,Z[i],-X[:,i])
+        insert_idx > 0 ? cycle_elements_left!(SS,K,insert_idx-1) : cycle_elements_left!(SS,K,K_n)
+        insert_idx > 0 ? cycle_elements_left!(theta,K,insert_idx-1) : cycle_elements_left!(theta,K,K_n)
 
-      else # T, K_i stay the same
-        PP[Z_update[i]] += -1
-
+      else # T, K_i, theta stay the same
+        PP[Z[i]] += -1
+        update_sufficient_stats!(SS,Z[i],-X[:,i])
       end
 
-      Z_update[i] = 0
+      Z[i] = 0
 
       ia = T[2:end] - T[1:(end-1)]
       # calculate log probabilities
@@ -202,7 +224,7 @@ function update_label_sequence(Z::Vector{Int},theta::Array{Real},X::Array{Real},
         # not proposing an arrival time
         logp[j] = log_CPPF(PP + [j==i for i in 1:K_n],T,alpha) + sum(logpdf.(ia_dist,ia .- zero_shift))
         T[end] == n ? nothing : logp[j] += log(1 - cdf(ia_dist,n - T[end] - zero_shift))
-        logp[j] += emission_logp(i,X,find(Z_update .== j))
+        logp[j] += emission_logp(X[:,i],PP[j],SS[j])
       end
 
       # proposing a new arrival time for a later cluster
@@ -213,7 +235,7 @@ function update_label_sequence(Z::Vector{Int},theta::Array{Real},X::Array{Real},
         logp[j] = cppf_counts(PP + [j==i for i in 1:K_n],alpha) + cppf_arrivals(T_prop,n,alpha)
         logp[j] += sum(logpdf.(ia_dist,ia_prop .- zero_shift))
         T_prop[end] == n ? nothing : logp[j] += log(1 - cdf(ia_dist,n - T_prop[end] - zero_shift))
-        logp[j] += emission_logp(i,X,find(Z_update .== j))
+        logp[j] += emission_logp(X[:,i],PP[j],SS[j])
       end
 
       # proposing a new cluster
@@ -221,16 +243,17 @@ function update_label_sequence(Z::Vector{Int},theta::Array{Real},X::Array{Real},
       ia_prop = T_prop[2:end] - T_prop[1:(end-1)]
       logp[K_n+1] = cppf_counts(PP,alpha) + cppf_arrivals(T_prop,n,alpha) + sum(logpdf.(ia_dist,ia_prop .- zero_shift))
       T_prop[end] == n ? nothing : logp[K_n+1] += log(1 - cdf(ia_dist,n - T_prop[end] - zero_shift))
-      logp[K_n+1] = emission_logp(i,X,[])
+      logp[K_n+1] = emission_logp(X[:,i],0,[])
 
       # sample cluster assignment
       p = log_sum_exp_weights(logp)
       c = wsample(1:size(logp,1),p)
 
       # update appropriate quantities
-      if c <= K_i[i] # only need to update partition
-        Z_update[i] = c
+      if c <= K_i[i] # only need to update partition & sufficient stats
+        Z[i] = c
         PP[c] += 1
+        update_sufficient_stats!(SS,Z[i],X[:,i])
       elseif K_i[i] < c <= K_n # add to later cluster; update arrival times and labels
         # K_i[i:end] += 1
         K_i[i] += 1
@@ -241,23 +264,63 @@ function update_label_sequence(Z::Vector{Int},theta::Array{Real},X::Array{Real},
         T[c] = i
         cycle_elements_right!(T,K_i[i],c)
         # update labels
-        Z_update[i] = K_i[i]
-        Z_update[Z_update .== c] = K_i[i]
-        Z_update[Z_update .> K_i[i]] += 1
+        Z[i] = K_i[i]
+        Z[Z .== c] = K_i[i]
+        Z[Z .> K_i[i]] += 1
+        update_sufficient_stats!(SS,Z[i],X[:,i])
+        cycle_elements_right!(SS,K_i[i],c)
+        cycle_elements_right!(theta,K_i[i],c)
       else # create new cluster
         K_i[i:end] += 1
-        Z_update[i] = K_i[i]
+        Z[i] = K_i[i]
         insert!(PP,K_i[i],1)
         insert!(T,K_i[i],i)
-
         # draw new cluster parameter
         new_theta = sample_cluster_param()
-        theta_update = hcat(theta_update[:,1:K_i[i]],new_theta,theta_update[:,(K_i[i]+1):end])
+        cluster_add!(theta,new_theta,K_i[i])
+        cluster_add!(SS,X[:,i],K_i[i])
 
       end
 
     end
-    return Z_update,theta_update
+    return Z,PP,SS,T,theta
+
+end
+
+function cluster_rm!(x::Vector{Vector{Float64}},k::Int)
+  """
+  removes column k from vector of vectors x (e.g. corresponding cluster params)
+  """
+  deleteat!(x,k)
+end
+
+function cluster_rm!(x::Vector{Float64},k::Int)
+  """
+  removes k-th entry from x
+  """
+  deleteat!(x,k)
+end
+
+function cluster_add!(x::Vector{Vector{Float64}},x_new::Vector{Float64},k::Int)
+  """
+  inserts `x_new` into `x` at entry `k`
+  """
+  insert!(x,k,x_new)
+end
+
+function cluster_add!(x::Vector{Float64},x_new::Float64,k::Int)
+  """
+  inserts `x_new` into `x` at entry `k`
+  """
+  insert!(x,k,x_new)
+end
+
+function emission_diag_normal_conjugate(X::Vector{Float64},SS::Array{Float64})
+    """
+    - `X`: observation at which to calculated pdf
+    - `SS`: current sufficient statistics [count,sum] of cluster to be computed
+      (excluding current data point if necessary)
+    """
 
 end
 
@@ -275,7 +338,19 @@ function cycle_elements_left!(V::Vector,start_idx::Int,end_idx::Int)
     end
     V[end_idx] = st
     return V
+end
 
+function cycle_elements_left!(X::Array,start_idx::Int,end_idx::Int)
+    """
+    - `X`: Array whose columns will be cycled
+    - `start_idx`: start of cycle (will be moved to end)
+    - `end_idx`: end of cycle
+    """
+
+    for i in 1:size(X,1)
+      X[i,:] = cycle_elements_left!(X[i,:],start_idx,end_idx)
+    end
+    return X
 end
 
 function cycle_elements_right!(V::Vector,start_idx::Int,end_idx::Int)
@@ -292,6 +367,19 @@ function cycle_elements_right!(V::Vector,start_idx::Int,end_idx::Int)
     V[start_idx] = ed
     return V
 
+end
+
+function cycle_elements_right!(X::Array,start_idx::Int,end_idx::Int)
+    """
+    - `X`: Array whose columns will be cycled
+    - `start_idx`: start of cycle (will be moved to end)
+    - `end_idx`: end of cycle
+    """
+
+    for i in 1:size(X,1)
+      X[i,:] = cycle_elements_right!(X[i,:],start_idx,end_idx)
+    end
+    return X
 end
 
 function cppf_counts(PP::Vector{Int},alpha::Float64)
@@ -356,17 +444,17 @@ function get_num_blocks(Z::Vector{Int})
     return K
 end
 
-function update_psi_parameters_sequence(Z::Vector{Int},alpha::Float64)
-    """
-    - `Z`: vector of labels corresponding to clusters/blocks in a partition
-    - `alpha`: 'discount' parameter
-    """
-
-    PP = seq2part(Z)
-    Psi = update_psi_parameters_partition(Psi,PP,alpha)
-    return Psi
-
-end
+# function update_psi_parameters_sequence(Z::Vector{Int},alpha::Float64)
+#     """
+#     - `Z`: vector of labels corresponding to clusters/blocks in a partition
+#     - `alpha`: 'discount' parameter
+#     """
+#
+#     PP = seq2part(Z)
+#     Psi = update_psi_parameters_partition(Psi,PP,alpha)
+#     return Psi
+#
+# end
 
 function update_psi_parameters_sequence!(Psi::Vector{Float64},Z::Vector{Int},alpha::Float64)
     """
@@ -376,27 +464,27 @@ function update_psi_parameters_sequence!(Psi::Vector{Float64},Z::Vector{Int},alp
     """
 
     PP = seq2part(Z)
-    pu = update_psi_parameters_partition!(Psi,PP,alpha)
+    update_psi_parameters_partition!(Psi,PP,alpha)
     # Psi[:] = [pu[i] for i in 1:size(Psi,1)]
     return Psi
 
 end
 
-function update_psi_parameters_partition(PP::Vector{Int},alpha::Float64)
-    """
-    - `PP`: arrival-ordered vector of partition block sizes
-    - `alpha`: 'discount' parameter
-    """
-    K = size(PP,1)
-    PP_partial = cumsum(PP)
-
-    Psi = zeros(Float64,K)
-    Psi[1] = 1
-    for j in 2:K
-      Psi[j] = rand(Beta(PP[j]-alpha,PP_partial[j-1]-(j-1)*alpha))
-    end
-    return Psi
-end
+# function update_psi_parameters_partition(PP::Vector{Int},alpha::Float64)
+#     """
+#     - `PP`: arrival-ordered vector of partition block sizes
+#     - `alpha`: 'discount' parameter
+#     """
+#     K = size(PP,1)
+#     PP_partial = cumsum(PP)
+#
+#     Psi = zeros(Float64,K)
+#     Psi[1] = 1
+#     for j in 2:K
+#       Psi[j] = rand(Beta(PP[j]-alpha,PP_partial[j-1]-(j-1)*alpha))
+#     end
+#     return Psi
+# end
 
 function update_psi_parameters_partition!(Psi::Vector{Float64},PP::Vector{Int},alpha::Float64)
     """
@@ -426,49 +514,49 @@ function log_sum_exp_weights(logw::Vector{Float64})
   return p
 end
 
-function update_arrival_times(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::DiscreteDistribution)
-    """
-    - `PP`: arrival-ordered vector of partition block sizes
-    - `T`: current arrival times (to be updated)
-    - `alpha`: 'discount' parameter
-    - `ia_dist`: distribution object corresponding to i.i.d. interarrivals
-    *** assumes fixed interarrival distribution
-    """
-    T_update = deepcopy(T)
-    zero_shift = Int(minimum(ia_dist) == 0)
-    K = size(T,1)
-    PP_partial = cumsum(PP)
-    n = PP_partial[end]
-
-    for j in 2:(K-1)
-      delta2 = T_update[j+1] - T_update[j-1]
-      # determine support
-      supp = 1:min(delta2 - 1, PP_partial[j-1] - T_update[j-1] + 1)
-      # calculate pmf of conditional distribution
-      log_p = zeros(Float64,size(supp,1))
-      for s in supp
-        log_p[s] = logpdf(ia_dist,delta2 - (s-zero_shift)) + logpdf(ia_dist,s-zero_shift)
-        log_p[s] += lbinom(PP_partial[j] - T_update[j-1] - s, PP[j] - 1)
-        log_p[s] += lgamma(T_update[j-1] + s - j*alpha) - lgamma(T_update[j-1] + s - 1 - (j-1)*alpha)
-      end
-      # sample an update
-      p = log_sum_exp_weights(log_p)
-      T_update[j] = T_update[j-1] + wsample(supp,p)
-    end
-
-    # update final arrival time
-    supp = 1:min(n - T_update[K-1] - 1, PP_partial[K-1] - T_update[K-1] + 1)
-    log_p = zeros(Float64,size(supp,1))
-    for s in supp
-      log_p[s] = logpdf(ia_dist, s-zero_shift) + log(1 - cdf(ia_dist,n - T_update[K-1]-(s-zero_shift)))
-      log_p[s] += lbinom(n - T_update[K-1] - s, PP[K] - 1)
-      log_p[s] += lgamma(T_update[K-1] + s - K*alpha) - lgamma(T_update[K-1] + s - 1 - (K-1)*alpha)
-    end
-    p = log_sum_exp_weights(log_p)
-    T_update[K] = T_update[K-1] + wsample(supp,p)
-
-    return T_update
-end
+# function update_arrival_times(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::DiscreteDistribution)
+#     """
+#     - `PP`: arrival-ordered vector of partition block sizes
+#     - `T`: current arrival times (to be updated)
+#     - `alpha`: 'discount' parameter
+#     - `ia_dist`: distribution object corresponding to i.i.d. interarrivals
+#     *** assumes fixed interarrival distribution
+#     """
+#     T_update = deepcopy(T)
+#     zero_shift = Int(minimum(ia_dist) == 0)
+#     K = size(T,1)
+#     PP_partial = cumsum(PP)
+#     n = PP_partial[end]
+#
+#     for j in 2:(K-1)
+#       delta2 = T_update[j+1] - T_update[j-1]
+#       # determine support
+#       supp = 1:min(delta2 - 1, PP_partial[j-1] - T_update[j-1] + 1)
+#       # calculate pmf of conditional distribution
+#       log_p = zeros(Float64,size(supp,1))
+#       for s in supp
+#         log_p[s] = logpdf(ia_dist,delta2 - (s-zero_shift)) + logpdf(ia_dist,s-zero_shift)
+#         log_p[s] += lbinom(PP_partial[j] - T_update[j-1] - s, PP[j] - 1)
+#         log_p[s] += lgamma(T_update[j-1] + s - j*alpha) - lgamma(T_update[j-1] + s - 1 - (j-1)*alpha)
+#       end
+#       # sample an update
+#       p = log_sum_exp_weights(log_p)
+#       T_update[j] = T_update[j-1] + wsample(supp,p)
+#     end
+#
+#     # update final arrival time
+#     supp = 1:min(n - T_update[K-1] - 1, PP_partial[K-1] - T_update[K-1] + 1)
+#     log_p = zeros(Float64,size(supp,1))
+#     for s in supp
+#       log_p[s] = logpdf(ia_dist, s-zero_shift) + log(1 - cdf(ia_dist,n - T_update[K-1]-(s-zero_shift)))
+#       log_p[s] += lbinom(n - T_update[K-1] - s, PP[K] - 1)
+#       log_p[s] += lgamma(T_update[K-1] + s - K*alpha) - lgamma(T_update[K-1] + s - 1 - (K-1)*alpha)
+#     end
+#     p = log_sum_exp_weights(log_p)
+#     T_update[K] = T_update[K-1] + wsample(supp,p)
+#
+#     return T_update
+# end
 
 function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::DiscreteDistribution)
     """
@@ -499,17 +587,6 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Discre
       p = log_sum_exp_weights(log_p)
       T[j] = T[j-1] + wsample(supp,p)
     end
-
-    # # update final arrival time
-    # supp = 1:min(n - T_update[K-1] - 1, PP_partial[K-1] - T_update[K-1] + 1)
-    # log_p = zeros(Float64,size(supp,1))
-    # for s in supp
-    #   log_p[s] = logpdf(ia_dist, s-zero_shift) + log(1 - cdf(ia_dist,n - T_update[K-1]-(s-zero_shift)))
-    #   log_p[s] += lbinom(n - T_update[K-1] - s, PP[K] - 1)
-    #   log_p[s] += lgamma(T_update[K-1] + s - K*alpha) - lgamma(T_update[j-1] + s - 1 - (K-1)*alpha)
-    # end
-    # p = log_sum_exp_weights(log_p)
-    # T_update[K] = T_update[K-1] + wsample(supp,p)
 
     return T
 end
@@ -600,6 +677,7 @@ function swap_elements!(x::Vector,i::Int,j::Int)
   return x
 end
 
+# needs to be tested (and made in-place)
 function update_block_order(PP::Vector{Int},T::Vector{Int},alpha::Float64)
     """
     - `PP`: current arrival-ordered vector of partition block sizes (to be updated)
@@ -613,6 +691,7 @@ function update_block_order(PP::Vector{Int},T::Vector{Int},alpha::Float64)
     PP_update = deepcopy(PP)
     K = size(PP,1)
     PP_partial_update = cumsum(PP_update)
+    perm = collect(1:K)
 
     for j in 1:(K-1)
 
@@ -633,10 +712,11 @@ function update_block_order(PP::Vector{Int},T::Vector{Int},alpha::Float64)
       swap = wsample([true,false],[logp_swap,logp_noswap])
       if swap
         swap_elements!(PP_update,j,j+1)
+        swap_elements!(perm,j,j+1)
         PP_partial_update[j] = (j == 1) ? PP_update[j] : PP_partial_update[j-1] + PP_update[j]
         PP_partial_update[j+1] = PP_partial_update[j] + PP_update[j+1]
       end
 
     end
-    return PP_update
+    return PP_update,perm
 end
