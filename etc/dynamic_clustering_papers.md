@@ -21,7 +21,7 @@ Estimate the noise in smoothing and filtering problems using DP mixture
 https://arxiv.org/pdf/math/0702225.pdf
 
 ### Dynamic Clustering via Asymptotics of the Dependent Dirichlet Process Mixture (2013), NIPS: 
-  - How, Broderick, Carin, et al
+  - How, Kulis, Carin, et al
   - https://arxiv.org/pdf/1305.6659.pdf
   
 ### Order-Based Dependent Dirichlet Processes (2012), JASA:
