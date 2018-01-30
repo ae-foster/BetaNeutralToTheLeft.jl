@@ -137,3 +137,23 @@ function generateGaussianDataset(N::Int, D::Int, a::Float64, alpha::Float64,
 
     return generateDataset(N, D, a, alpha, cluster_creator, emission, Float64)
 end
+
+function generateDriftingGaussian(N::Int, D::Int, a::Float64, alpha::Float64,
+        sigma2::Float64, sigma2_observe::Float64, drift::Vector{Float64})
+    # N: number of observations/documents
+    # D: size of vocabulary
+    # a: Geometric parameter for inter-arrival times
+    # alpha: Neutral to the left parameter
+    # sigma: Variance of cluster creation
+    # sigma_observe: Variance of emission
+    # drift: The drift in the mean (starts at 0)
+
+    cluster_mean = zeros(D)
+    cluster_creator = function make_drift_cluster()
+        cluster_mean += drift
+        return rand(MvNormal(cluster_mean, sqrt(sigma2)))
+    end
+    emission = (cluster) -> rand(MvNormal(cluster, sqrt(sigma2_observe)))
+
+    return generateDataset(N, D, a, alpha, cluster_creator, emission, Float64)
+end
