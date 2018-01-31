@@ -57,3 +57,8 @@ https://arxiv.org/pdf/math/0702225.pdf
 ### Generalized P´olya Urn for Time-Varying Pitman-Yor Processes (2017), JMLR:
   - Caron, Doucet, et al
   - http://jmlr.org/papers/volume18/10-231/10-231.pdf
+  
+### Stick-breaking autoregressive processes (2011), J. Econometrics:
+  - Griffin & Steel
+  - https://warwick.ac.uk/fac/sci/statistics/staff/academic-research/steel/steel_homepage/techrep/sbar_rev.pdf
+  
