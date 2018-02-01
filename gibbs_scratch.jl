@@ -10,7 +10,7 @@ include("ntl_gibbs.jl")
 ##### generate synthetic label sequence
 
 # set number of labels; parameters
-N = 1000
+N = 200
 alpha = 0.5
 p = 0.25
 
@@ -79,10 +79,11 @@ function gibbs_ordered_partition(n_iter::Int,n_burn::Int,n_thin::Int,
 
   K = size(PP,1)
   N = sum(PP)
-  # initialize
+  # pre-allocate
   psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin)))
   T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin)))
   p_gibbs = zeros(Float64,Int(ceil((n_iter-n_burn)/n_thin)))
+  # initialize
   psi_current = 0.5*ones(Float64,K)
   p_current = rand(Beta(a,b))
   T_current = initialize_arrival_times(PP,alpha,ia_dist(p_current))
@@ -120,9 +121,80 @@ psi_gibbs,T_gibbs,p_gibbs = gibbs_ordered_partition(n_gibbs,n_burn,n_thin,PP_syn
 # psi_mean_gibbs = mean(psi_gibbs,2)
 # plot(psi_map.-psi_mean_gibbs,lw=2)
 
-# ***** need to test permutation inference *****
+##############################
+# Gibbs sampler when observing an arbitrarily ordered partition (but not arrivals)
+# ***** need to make this able to handle general interarrival distribution/updates
+function gibbs_partition(n_iter::Int,n_burn::Int,n_thin::Int,
+  PP_sorted::Vector{Int},alpha::Float64,ia_dist,a::Float64,b::Float64)
+
+  K = size(PP_sorted,1)
+  N = sum(PP_sorted)
+  # pre-allocate
+  psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin)))
+  T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin)))
+  sigma_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin)))
+  p_gibbs = zeros(Float64,Int(ceil((n_iter-n_burn)/n_thin)))
+  # initialize
+  psi_current = 0.5*ones(Float64,K)
+  p_current = rand(Beta(a,b))
+  sigma_current = collect(1:K) # start in decreasing order
+  T_current = initialize_arrival_times(PP_sorted[sigma_current],alpha,ia_dist(p_current))
+  ct_gibbs = 0
+
+  for n in 1:n_iter
+    update_psi_parameters_partition!(psi_current,PP_sorted[sigma_current],alpha)
+    update_block_order!(sigma_current,PP_sorted,T_current,alpha)
+    update_arrival_times!(T_current,PP_sorted[sigma_current],alpha,ia_dist(p_current))
+    p_current = update_geometric_interarrival_param_partition(p_current,K,N,a,b)
+    if (n > n_burn) && mod(n - n_burn,n_thin)==0
+      ct_gibbs += 1
+      psi_gibbs[:,ct_gibbs] = psi_current
+      sigma_gibbs[:,ct_gibbs] = sigma_current
+      T_gibbs[:,ct_gibbs] = T_current
+      p_gibbs[ct_gibbs] = p_current
+    end
+
+  end
+
+  return psi_gibbs,T_gibbs,p_gibbs,sigma_gibbs
 
 
+end
+
+N = 2000
+alpha = -10.
+p = 0.25
+
+# create intearrival distribution object and synthetic data
+interarrival_dist = Geometric
+Z_syn, PP_syn, T_syn = generateLabelSequence(N,alpha,interarrival_dist(p))
+
+K = size(PP_syn,1)
+
+n_gibbs = 20000
+n_burn = 5000
+n_thin = 100
+a_beta = 1.
+b_beta = 1.
+PP_sorted = sort(PP_syn,rev=true)
+@time psi_gibbs,T_gibbs,p_gibbs,sigma_gibbs =
+  gibbs_partition(n_gibbs,n_burn,n_thin,PP_sorted,alpha,interarrival_dist,a_beta,b_beta)
+
+#
+
+#
+# median_order = median(sigma_gibbs,2)
+p_order = [0.05; 0.25; 0.5; 0.75; 0.95]
+quantile_order = zeros(Float64,size(p_order,1),size(sigma_gibbs,1))
+for q in 1:size(p_order,1)
+  for k in 1:K
+    quantile_order[q,k] = quantile(sigma_gibbs[k,:],p_order[q])
+  end
+end
+scatter(PP_sorted,quantile_order',legend=false)
+plot(quantile_order',legend=false)
+
+### DEVELOPMENT ON PAUSE (THIS IS UNTESTED AS OF PAUSE)
 ##############################
 # generate synthetic d-dimensional diagonal Gaussian mixture data
 # treat variance as known

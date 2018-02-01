@@ -678,7 +678,7 @@ function swap_elements!(x::Vector,i::Int,j::Int)
 end
 
 # needs to be tested (and made in-place)
-function update_block_order(PP::Vector{Int},T::Vector{Int},alpha::Float64)
+function update_block_order!(perm::Vector{Int},PP::Vector{Int},T::Vector{Int},alpha::Float64)
     """
     - `PP`: current arrival-ordered vector of partition block sizes (to be updated)
     - `T`: arrival times
@@ -688,10 +688,9 @@ function update_block_order(PP::Vector{Int},T::Vector{Int},alpha::Float64)
     There are likely better (more efficient) ways to do this.
     """
 
-    PP_update = deepcopy(PP)
     K = size(PP,1)
+    PP_update = PP[perm]
     PP_partial_update = cumsum(PP_update)
-    perm = collect(1:K)
 
     for j in 1:(K-1)
 
@@ -718,5 +717,5 @@ function update_block_order(PP::Vector{Int},T::Vector{Int},alpha::Float64)
       end
 
     end
-    return PP_update,perm
+    return perm
 end
