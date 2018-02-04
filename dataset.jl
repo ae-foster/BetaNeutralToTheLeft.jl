@@ -62,6 +62,11 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
 end
 
 function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::DiscreteDistribution)
+  ia_dist = (x,y) -> interarrival_dist
+  generateInterarrivalTimes(TK,N,ia_dist)
+end
+
+function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::Function)
     """
     - `TK`: 'T' if `N` is the total number of observations;
         'K' if `N` is the total number of arrivals
@@ -72,43 +77,42 @@ function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::Discrete
     # check function arguments
     TK != 'K' && TK != 'T' ? error("`TK` must be 'T' or 'K'") : nothing
 
-    zero_shift = Int(minimum(interarrival_dist) == 0)
+    zero_shift = Int(minimum(interarrival_dist(1,1)) == 0)
 
     if TK == 'K'
-      ia = rand(interarrival_dist, N) + zero_shift
-      unshift!(ia,1)
-      T = cumsum(ia)
-      return T
-    else
-      m = mean(interarrival_dist)
-      n_0 = Int(ceil(N/m))
-      ia = rand(interarrival_dist, n_0) + zero_shift
-      unshift!(ia,1)
-      T = cumsum(ia)
-      full_check = (T .<= N)
-
-      if sum(full_check) < n_0
-        T = T[full_check]
-        return T
-      else
-        s = T[end]
-        while s < N
-          s_plus = rand(interarrival_dist) + zero_shift + s
-          s_plus <= N ? push!(T,s_plus) : nothing
-          s = s_plus
-        end
-        return T
+      T = zeros(Int64,N)
+      T[1] = 1 # first arrival time is always 1
+      for j in 2:N
+        T[j] = rand(interarrival_dist(T[j-1],j-1)) + T[j-1] + zero_shift
       end
+      # return T
+    else
+      T = [1]
+      j = 1
+      while T[j] < N
+        j += 1
+        append!(T,rand(interarrival_dist(T[j-1],j-1)) + T[j-1] + zero_shift)
+      end
+      if T[end] > N
+        pop!(T)
+      end
+      # return T
     end
-
+    return T
 end
 
 function generateLabelSequence(N::Int, alpha::Float64,
         interarrival_dist::DiscreteDistribution)
+    ia_diat = (x,y) -> interarrival_dist
+    generateLabelSequence(N,alpha,ia_dist)
+end
+
+function generateLabelSequence(N::Int, alpha::Float64,
+        interarrival_dist::Function)
     """
     - `N`: number of observations in the sequence
     - `alpha`: 'discount parameter' in size-biased reinforcement
-    - `interarrival_dist`: distribution object to generate i.i.d. interarrivals
+    - `interarrival_dist`: distribution object to generate interarrivals
     """
     Z = zeros(Int, N) # sequence of labels
     T = generateInterarrivalTimes('T', N, interarrival_dist)
