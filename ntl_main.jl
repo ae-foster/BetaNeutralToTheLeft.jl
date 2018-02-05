@@ -49,7 +49,7 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   assert(all(T_data .== get_arrivals(Z_data)))
 
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
-  N = 4000
+  N = 200
   ntl_alpha = 0.5
   geom_p = 0.25
   # create intearrival distribution object and synthetic data
@@ -143,6 +143,7 @@ elseif arrivals=="geometric"
   ia_prior_params = [a_beta; b_beta]
   n_ia_params = 1
   # set update functions
+  # initialize_arrival_params = v -> [(K-1)/(N-1)]
   initialize_arrival_params = v -> [(K-1)/(N-1)]
   update_arrival_params! = update_geometric_interarrival_param!
 

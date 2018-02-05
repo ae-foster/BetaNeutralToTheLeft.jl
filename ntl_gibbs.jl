@@ -36,22 +36,22 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},Psi::Vector{Float64},
     # shift distributions with non-zero mass on zero
     zero_shift = Int(minimum(ia_dist) == 0)
 
-    PP_partial = cumsum(PP)
-    # pop!(PP_partial)
+    PP_bar = cumsum(PP)
+    # pop!(PP_bar)
     ia = T[2:end] .- T[1:(end-1)]
 
     K = size(Psi,1)
     idx = 1:(K-1)
     N = sum(PP)
 
-    log_p = dot((PP[2:end] .- alpha .- 1),log_Psi[2:end]) + dot((PP_partial[1:(end-1)] .- idx.*alpha .- 1), log_Psi_c[2:end])
+    log_p = dot((PP[2:end] .- alpha .- 1),log_Psi[2:end]) + dot((PP_bar[1:(end-1)] .- idx.*alpha .- 1), log_Psi_c[2:end])
     # include arrival times
     log_p += sum(logpdf.(ia_dist, ia .- zero_shift))
     N - T[end] > 0 ? log_p += log(1 - cdf(ia_dist, N-T[end]-zero_shift)) : nothing
     log_p += -sum([lbeta(1 - alpha,T[j] - 1 - (j-1)*alpha) for j in 2:K])
     # include binomial coefficients if for a partition
     if is_partition
-      log_p += sum([lbinom(PP_partial[j] - T[j],PP[j] - 1) for j in 2:K])
+      log_p += sum([lbinom(PP_bar[j] - T[j],PP[j] - 1) for j in 2:K])
     end
 
     return log_p
@@ -112,10 +112,10 @@ function ntl_alpha_logpdf(alpha::Float64,PP::Vector{Int},T::Vector{Int},log_prio
     log_prior is a function that returns the (possibly unnormalized) prior log-probability
       of `alpha`
     """
-    PP_partial = cumsum(PP)
+    PP_bar = cumsum(PP)
     logp = log_prior(1 - alpha) # prior is specified as a distribution on (0,Inf); alpha ∈ (-Inf,1)
     for j in 2:size(PP,1)
-      logp += lbeta(PP[j] - alpha, PP_partial[j-1] - (j-1)*alpha) - lbeta(1-alpha,T[j] - 1 - (j-1)*alpha)
+      logp += lbeta(PP[j] - alpha, PP_bar[j-1] - (j-1)*alpha) - lbeta(1-alpha,T[j] - 1 - (j-1)*alpha)
     end
     return logp
 end
@@ -510,12 +510,12 @@ end
 #     - `alpha`: 'discount' parameter
 #     """
 #     K = size(PP,1)
-#     PP_partial = cumsum(PP)
+#     PP_bar = cumsum(PP)
 #
 #     Psi = zeros(Float64,K)
 #     Psi[1] = 1
 #     for j in 2:K
-#       Psi[j] = rand(Beta(PP[j]-alpha,PP_partial[j-1]-(j-1)*alpha))
+#       Psi[j] = rand(Beta(PP[j]-alpha,PP_bar[j-1]-(j-1)*alpha))
 #     end
 #     return Psi
 # end
@@ -527,11 +527,11 @@ function update_psi_parameters_partition!(Psi::Vector{Float64},PP::Vector{Int},a
     - `alpha`: 'discount' parameter
     """
     K = size(PP,1)
-    PP_partial = cumsum(PP)
+    PP_bar = cumsum(PP)
 
     Psi[1] = 1
     for j in 2:K
-      Psi[j] = rand(Beta(PP[j]-alpha,PP_partial[j-1]-(j-1)*alpha))
+      Psi[j] = rand(Beta(PP[j]-alpha,PP_bar[j-1]-(j-1)*alpha))
     end
     return Psi
 end
@@ -559,18 +559,18 @@ end
 #     T_update = deepcopy(T)
 #     zero_shift = Int(minimum(ia_dist) == 0)
 #     K = size(T,1)
-#     PP_partial = cumsum(PP)
-#     n = PP_partial[end]
+#     PP_bar = cumsum(PP)
+#     n = PP_bar[end]
 #
 #     for j in 2:(K-1)
 #       delta2 = T_update[j+1] - T_update[j-1]
 #       # determine support
-#       supp = 1:min(delta2 - 1, PP_partial[j-1] - T_update[j-1] + 1)
+#       supp = 1:min(delta2 - 1, PP_bar[j-1] - T_update[j-1] + 1)
 #       # calculate pmf of conditional distribution
 #       log_p = zeros(Float64,size(supp,1))
 #       for s in supp
 #         log_p[s] = logpdf(ia_dist,delta2 - (s-zero_shift)) + logpdf(ia_dist,s-zero_shift)
-#         log_p[s] += lbinom(PP_partial[j] - T_update[j-1] - s, PP[j] - 1)
+#         log_p[s] += lbinom(PP_bar[j] - T_update[j-1] - s, PP[j] - 1)
 #         log_p[s] += lgamma(T_update[j-1] + s - j*alpha) - lgamma(T_update[j-1] + s - 1 - (j-1)*alpha)
 #       end
 #       # sample an update
@@ -579,7 +579,7 @@ end
 #     end
 #
 #     # update final arrival time
-#     supp = 1:min(n - T_update[K-1] - 1, PP_partial[K-1] - T_update[K-1] + 1)
+#     supp = 1:min(n - T_update[K-1] - 1, PP_bar[K-1] - T_update[K-1] + 1)
 #     log_p = zeros(Float64,size(supp,1))
 #     for s in supp
 #       log_p[s] = logpdf(ia_dist, s-zero_shift) + log(1 - cdf(ia_dist,n - T_update[K-1]-(s-zero_shift)))
@@ -607,19 +607,19 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Functi
     """
     zero_shift = Int(minimum(ia_dist(1,1)) == 0)
     K = size(PP,1)
-    PP_partial = cumsum(PP)
-    n = PP_partial[end]
+    PP_bar = cumsum(PP)
+    n = PP_bar[end]
 
     T = zeros(Int,K)
     T[1] = 1
 
     for j in 2:K
       # determine support of interarrival
-      supp = 1:(PP_partial[j-1] - T[j-1] + 1)
+      supp = 1:(PP_bar[j-1] - T[j-1] + 1)
       # calculate pmf of conditional distribution
       log_p = zeros(Float64,size(supp,1))
       log_p += logpdf.(ia_dist(T[j-1],j-1),supp.-zero_shift)
-      log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
+      log_p += lbinom.(PP_bar[j] .- T[j-1] .- supp, PP[j] - 1)
       log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
       # sample an update
       p = log_sum_exp_weights(log_p)
@@ -633,6 +633,7 @@ function sample_interarrival(j::Int,T_jm1::Int,T_jp1::Int,ia_dist::Function,
   zero_shift::Int,PP_bar_jm1::Int,PP_j::Int,alpha::Float64)
   """
   Utility function for arrival time updates
+    (j,T[j-1],T[j+1],ia_dist,zero_shift,PP_bar[j-1],PP[j],alpha)
   """
   delta2 = T_jp1 - T_jm1
   # determine support
@@ -680,7 +681,8 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
     - `alpha`: 'discount' parameter
     - `ia_dist`: function that creates a distribution object corresponding to interarrival distribution
     """
-    Threads.nthreads() > 1 ? update_arrival_times_mt!(T,PP,alpha,ia_dist) : update_arrival_times_st!(T,PP,alpha,ia_dist)
+    update_arrival_times_st!(T,PP,alpha,ia_dist)
+    # Threads.nthreads() > 1 ? update_arrival_times_mt!(T,PP,alpha,ia_dist) : update_arrival_times_st!(T,PP,alpha,ia_dist)
 end
 
 function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::DiscreteDistribution)
@@ -698,21 +700,21 @@ function update_arrival_times_mt!(T::Vector{Int},PP::Vector{Int},alpha::Float64,
     """
     zero_shift = Int(minimum(ia_dist(1,1)) == 0)
     K = size(T,1)
-    PP_partial = cumsum(PP)
-    n = PP_partial[end]
+    PP_bar = cumsum(PP)
+    n = PP_bar[end]
 
     evens = 2:2:(K-1)
     odds = 3:2:(K-1)
     # delta = zeros(Int64,size(evens,1))
-    Threads.@threads for j in evens
-      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_partial[j-1],PP[j],alpha)
+    for j in evens
+      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_bar[j-1],PP[j],alpha)
     end
 
-    Threads.@threads for j in odds
-      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_partial[j-1],PP[j],alpha)
+    for j in odds
+      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_bar[j-1],PP[j],alpha)
     end
 
-    T[K] = sample_final_arrival(T[K-1],K,n,ia_dist,zero_shift,PP_partial[K-1],PP[K],alpha)
+    T[K] = sample_final_arrival(T[K-1],K,n,ia_dist,zero_shift,PP_bar[K-1],PP[K],alpha)
 end
 
 function update_arrival_times_st!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::Function)
@@ -725,18 +727,30 @@ function update_arrival_times_st!(T::Vector{Int},PP::Vector{Int},alpha::Float64,
     """
     zero_shift = Int(minimum(ia_dist(1,1)) == 0)
     K = size(T,1)
-    PP_partial = cumsum(PP)
-    n = PP_partial[end]
+    PP_bar = cumsum(PP)
+    n = PP_bar[end]
 
     for j in 2:(K-1)
-      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_partial[j-1],PP[j],alpha)
+      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_bar[j-1],PP[j],alpha)
+      # delta2 = T[j+1] - T[j-1]
+      # # determine support
+      # supp = 1:min(delta2 - 1, PP_bar[j-1] - T[j-1] + 1)
+      # log_p = zeros(Float64,size(supp,1))
+      # log_p += logpdf(ia_dist(T[j-1],j-1), supp.-zero_shift)
+      # log_p += lbinom.(PP_bar[j] .- T[j-1] .- supp, PP[j] - 1)
+      # log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
+      # for s in supp
+      #   log_p[s] += logpdf(ia_dist(T[j-1]+s,j), delta2 - (s-zero_shift)) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
+      # end
+      # p = log_sum_exp_weights(log_p)
+      # T[j] = T[j-1] + wsample(supp,p)
     end
 
     # update final arrival time
     # if T[K-1]==(n-1)
     #   T[K] = n
     # else
-    #   supp = 1:min(n - T[K-1] - 1, PP_partial[K-1] - T[K-1] + 1)
+    #   supp = 1:min(n - T[K-1] - 1, PP_bar[K-1] - T[K-1] + 1)
     #   log_p = zeros(Float64,size(supp,1))
     #   log_p += logpdf(ia_dist(T[K-1],K-1), supp.-zero_shift)
     #   log_p += lbinom.(n .- T[K-1] .- supp, PP[K] - 1)
@@ -749,7 +763,7 @@ function update_arrival_times_st!(T::Vector{Int},PP::Vector{Int},alpha::Float64,
     #   p = log_sum_exp_weights(log_p)
     #   T[K] = T[K-1] + wsample(supp,p)
     # end
-    T[K] = sample_final_arrival(T[K-1],K,n,ia_dist,zero_shift,PP_partial[K-1],PP[K],alpha)
+    T[K] = sample_final_arrival(T[K-1],K,n,ia_dist,zero_shift,PP_bar[K-1],PP[K],alpha)
 
     return T
 end
@@ -774,13 +788,13 @@ function update_block_order!(perm::Vector{Int},PP::Vector{Int},T::Vector{Int},al
     """
 
     K = size(PP,1)
-    PP_partial = cumsum(PP)
+    PP_bar = cumsum(PP)
 
     for j in 1:(K-1)
 
-      j==1 ? ppbar_jm1 = 0 : ppbar_jm1 = PP_partial[j-1]
-      ppbar_jp1 = PP_partial[j+1]
-      ppbar_j = PP_partial[j]
+      j==1 ? ppbar_jm1 = 0 : ppbar_jm1 = PP_bar[j-1]
+      ppbar_jp1 = PP_bar[j+1]
+      ppbar_j = PP_bar[j]
       pp_j = PP[j]
       pp_jp1 = PP[j+1]
 
@@ -799,8 +813,8 @@ function update_block_order!(perm::Vector{Int},PP::Vector{Int},T::Vector{Int},al
       if swap
         swap_elements!(PP,j,j+1)
         swap_elements!(perm,j,j+1)
-        PP_partial[j] = (j == 1) ? PP[j] : PP_partial[j-1] + PP[j]
-        PP_partial[j+1] = PP_partial[j] + PP[j+1]
+        PP_bar[j] = (j == 1) ? PP[j] : PP_bar[j-1] + PP[j]
+        PP_bar[j+1] = PP_bar[j] + PP[j+1]
       end
 
     end
