@@ -1,7 +1,7 @@
 using Plots
 using StatsBase
 
-f = open("/data/flyrobin/foster/Documents/NTL.jl/sorted-stackoverflow.txt")
+f = open("/data/flyrobin/foster/Documents/NTL.jl/sorted-mathoverflow.txt")
 arrival_times = Dict{Any, Int}()
 degrees = Dict{Any, Int}()
 for (i, ln) in enumerate(eachline(f))
@@ -32,10 +32,11 @@ degs = collect(values(degrees))
 # Plots.gui()
 
 ef = ecdf(degs)
-x = logspace(log(min(degs...)+1), log(max(degs...)-1), 100)
+x = logspace(log(min(degs...)), log(max(degs...)), 100)
 output = [(1-ef(t)) for t in x]
-Plots.plot(x, output, xscale=:log10, yscale=:log10)
+Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10)
 Plots.gui()
 
 n = sum(degs)
-println("alpha hat ", 1 + n/(sum(log(degs)) - n*log(0.5)))
+xmin = 5
+println("alpha hat ", 1 + n/(sum(log.(degs[degs.>xmin])) - n*log(xmin - 0.5)))
