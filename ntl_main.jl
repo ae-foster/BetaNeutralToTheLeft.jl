@@ -5,6 +5,7 @@ using StatsBase
 include("dataset.jl")
 include("ntl_gibbs.jl")
 include("slice.jl")
+include("evaluation.jl")
 
 
 ###########################################################################
@@ -48,7 +49,7 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   assert(all(T_data .== get_arrivals(Z_data)))
 
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
-  N = 200
+  N = 4000
   ntl_alpha = 0.5
   geom_p = 0.25
   # create intearrival distribution object and synthetic data
@@ -82,6 +83,8 @@ else
   PP = deepcopy(PP_data)
 end
 
+K = size(PP,1)
+N = sum(PP)
 gibbs_alpha ? nothing : alpha_fixed = ntl_alpha
 
 ###########################################################################
@@ -140,7 +143,7 @@ elseif arrivals=="geometric"
   ia_prior_params = [a_beta; b_beta]
   n_ia_params = 1
   # set update functions
-  initialize_arrival_params = v -> [rand(Beta(v[1],v[2]))]
+  initialize_arrival_params = v -> [(K-1)/(N-1)]
   update_arrival_params! = update_geometric_interarrival_param!
 
 end
@@ -154,8 +157,6 @@ end
 # If block order is being inferred, PP should be sorted in descending order;
 #   otherwise, it should be in arrival-order
 
-K = size(PP,1)
-N = sum(PP)
 # pre-allocate sample arrays
 gibbs_psi ? psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
 gibbs_arrival_times ? T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
@@ -180,20 +181,20 @@ perm_current = collect(1:K) # initial permutation order
 
 # Gibbs sampler
 ct_gibbs = 0 # counts when to store state of Markov Chain
-for s in 1:n_iter
-  gibbs_psi ? update_psi_parameters_partition!(psi_current,PP[perm_current],alpha_current[1]) : nothing
-  gibbs_arrival_times ? update_arrival_times!(T_current,PP[perm_current],alpha_current[1],ia_dist(arrival_params_current)) : nothing
-  gibbs_alpha ? update_ntl_alpha!(alpha_current,PP[perm_current],T_current,ntl_alpha_log_prior,w_alpha) : nothing
-  gibbs_perm_order ? update_block_order!(perm_current,PP[perm_current],T_current,alpha_current[1]) : nothing
-  gibbs_ia_params ? update_arrival_params!(arrival_params_current,T_current,N,ia_prior_params) : nothing
+@time for s in 1:n_iter
+  gibbs_psi ? update_psi_parameters_partition!(psi_current,PP[perm_current],alpha_current[1]) : nothing ;
+  gibbs_arrival_times ? update_arrival_times!(T_current,PP[perm_current],alpha_current[1],ia_dist(arrival_params_current)) : nothing ;
+  gibbs_alpha ? update_ntl_alpha!(alpha_current,PP[perm_current],T_current,ntl_alpha_log_prior,w_alpha) : nothing ;
+  gibbs_perm_order ? update_block_order!(perm_current,PP[perm_current],T_current,alpha_current[1]) : nothing ;
+  gibbs_ia_params ? update_arrival_params!(arrival_params_current,T_current,N,ia_prior_params) : nothing ;
   # p_current = update_geometric_interarrival_param_partition(p_current,K,N,a,b)
   if (s > n_burn) && mod(s - n_burn,n_thin)==0
-    ct_gibbs += 1
-    gibbs_psi ? psi_gibbs[:,ct_gibbs] = psi_current : nothing
-    gibbs_arrival_times ? T_gibbs[:,ct_gibbs] = T_current : nothing
-    gibbs_alpha ? alpha_gibbs[ct_gibbs] = alpha_current[1] : nothing
-    gibbs_ia_params ? ia_params_gibbs[:,ct_gibbs] = arrival_params_current : nothing
-    gibbs_perm_order ? perm_gibbs[:,ct_gibbs] = perm_current : nothing
+    ct_gibbs += 1 ;
+    gibbs_psi ? psi_gibbs[:,ct_gibbs] = psi_current : nothing ;
+    gibbs_arrival_times ? T_gibbs[:,ct_gibbs] = T_current : nothing ;
+    gibbs_alpha ? alpha_gibbs[ct_gibbs] = alpha_current[1] : nothing ;
+    gibbs_ia_params ? ia_params_gibbs[:,ct_gibbs] = arrival_params_current : nothing ;
+    gibbs_perm_order ? perm_gibbs[:,ct_gibbs] = perm_current : nothing ;
   end
 
 end
@@ -201,6 +202,14 @@ end
 ############################################################################
 # end of Gibbs sampling code
 ############################################################################
+
+############################################################################
+# some performance evaluation metrics
+############################################################################
+
+# mean L^1 norm of difference between sampled arrivals and true arrivals
+gibbs_arrival_times ? T_diff = mean_arrival_time_Lp(T_gibbs,T_data,1.0) : nothing
+
 
 ############################################################################
 # some plots to check for parameter recovery

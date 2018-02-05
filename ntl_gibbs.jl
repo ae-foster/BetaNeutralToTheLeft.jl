@@ -629,58 +629,127 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Functi
     return T
 end
 
-function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::DiscreteDistribution)
-  f = (x,y)->ia_dist
-  update_arrival_times!(T,PP,alpha,f)
+function sample_interarrival(j::Int,T_jm1::Int,T_jp1::Int,ia_dist::Function,
+  zero_shift::Int,PP_bar_jm1::Int,PP_j::Int,alpha::Float64)
+  """
+  Utility function for arrival time updates
+  """
+  delta2 = T_jp1 - T_jm1
+  # determine support
+  supp = 1:min(delta2 - 1, PP_bar_jm1 - T_jm1 + 1)
+  # calculate pmf of conditional distribution
+  log_p = zeros(Float64,size(supp,1))
+  log_p += logpdf(ia_dist(T_jm1,j-1),supp.-zero_shift)
+  log_p += lbinom.(PP_bar_jm1 .+ PP_j .- T_jm1 .- supp, PP_j - 1)
+  log_p += lgamma.(T_jm1 .+ supp .- j*alpha) .- lgamma.(T_jm1 .+ supp .- 1 .- (j-1)*alpha)
+  for s in supp
+    log_p[s] += logpdf(ia_dist(T_jm1+s,j),delta2 - (s-zero_shift))
+  end
+  # sample an update
+  p = log_sum_exp_weights(log_p)
+  return wsample(supp,p)
+end
+
+function sample_final_arrival(T_Km1::Int,K::Int,n::Int,ia_dist::Function,
+  zero_shift::Int,PP_bar_Km1::Int,PP_K::Int,alpha::Float64)
+
+  if T_Km1==(n-1)
+    TK = n
+  else
+    supp = 1:min(n - T_Km1 - 1, PP_bar_Km1 - T_Km1 + 1)
+    log_p = zeros(Float64,size(supp,1))
+    log_p += logpdf(ia_dist(T_Km1,K-1), supp.-zero_shift)
+    log_p += lbinom.(n .- T_Km1 .- supp, PP_K - 1)
+    log_p += lgamma.(T_Km1 .+ supp .- K*alpha) .- lgamma.(T_Km1 .+ supp .- 1 .- (K-1)*alpha)
+    for s in supp
+      p_gt = 1. - cdf(ia_dist(T_Km1+s,K),n-(T_Km1+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
+      abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
+      log_p[s] += logpdf(ia_dist(T_Km1,K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
+    end
+    p = log_sum_exp_weights(log_p)
+    TK = T_Km1 + wsample(supp,p)
+  end
+  return TK
 end
 
 function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::Function)
     """
+    Takes advantage of multiple threads if possible.
     - `PP`: arrival-ordered vector of partition block sizes
     - `T`: current arrival times (to be updated)
     - `alpha`: 'discount' parameter
     - `ia_dist`: function that creates a distribution object corresponding to interarrival distribution
     """
-    # T_update = deepcopy(T)
+    Threads.nthreads() > 1 ? update_arrival_times_mt!(T,PP,alpha,ia_dist) : update_arrival_times_st!(T,PP,alpha,ia_dist)
+end
+
+function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::DiscreteDistribution)
+  f = (x,y)->ia_dist
+  update_arrival_times!(T,PP,alpha,f)
+end
+
+function update_arrival_times_mt!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::Function)
+    """
+    multi-threaded version
+    - `PP`: arrival-ordered vector of partition block sizes
+    - `T`: current arrival times (to be updated)
+    - `alpha`: 'discount' parameter
+    - `ia_dist`: function that creates a distribution object corresponding to interarrival distribution
+    """
+    zero_shift = Int(minimum(ia_dist(1,1)) == 0)
+    K = size(T,1)
+    PP_partial = cumsum(PP)
+    n = PP_partial[end]
+
+    evens = 2:2:(K-1)
+    odds = 3:2:(K-1)
+    # delta = zeros(Int64,size(evens,1))
+    Threads.@threads for j in evens
+      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_partial[j-1],PP[j],alpha)
+    end
+
+    Threads.@threads for j in odds
+      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_partial[j-1],PP[j],alpha)
+    end
+
+    T[K] = sample_final_arrival(T[K-1],K,n,ia_dist,zero_shift,PP_partial[K-1],PP[K],alpha)
+end
+
+function update_arrival_times_st!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_dist::Function)
+    """
+    single-threaded version
+    - `PP`: arrival-ordered vector of partition block sizes
+    - `T`: current arrival times (to be updated)
+    - `alpha`: 'discount' parameter
+    - `ia_dist`: function that creates a distribution object corresponding to interarrival distribution
+    """
     zero_shift = Int(minimum(ia_dist(1,1)) == 0)
     K = size(T,1)
     PP_partial = cumsum(PP)
     n = PP_partial[end]
 
     for j in 2:(K-1)
-      delta2 = T[j+1] - T[j-1]
-      # determine support
-      supp = 1:min(delta2 - 1, PP_partial[j-1] - T[j-1] + 1)
-      # calculate pmf of conditional distribution
-      log_p = zeros(Float64,size(supp,1))
-      log_p += logpdf.(ia_dist(T[j-1],j-1),supp.-zero_shift)
-      log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
-      log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
-      for s in supp
-        log_p[s] += logpdf(ia_dist(T[j-1]+s,j),delta2 - (s-zero_shift))
-      end
-      # sample an update
-      p = log_sum_exp_weights(log_p)
-      T[j] = T[j-1] + wsample(supp,p)
+      T[j] = T[j-1] + sample_interarrival(j,T[j-1],T[j+1],ia_dist,zero_shift,PP_partial[j-1],PP[j],alpha)
     end
 
     # update final arrival time
-    if T[K-1]==(n-1)
-      T[K] = n
-    else
-      supp = 1:min(n - T[K-1] - 1, PP_partial[K-1] - T[K-1] + 1)
-      log_p = zeros(Float64,size(supp,1))
-      log_p += logpdf.(ia_dist(T[K-1],K-1), supp.-zero_shift)
-      log_p += lbinom.(n .- T[K-1] .- supp, PP[K] - 1)
-      log_p += lgamma.(T[K-1] .+ supp .- K*alpha) .- lgamma.(T[K-1] .+ supp .- 1 .- (K-1)*alpha)
-      for s in supp
-        p_gt = 1. - cdf(ia_dist(T[K-1]+s,K),n-(T[K-1]+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
-        abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
-        log_p[s] += logpdf(ia_dist(T[K-1],K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
-      end
-      p = log_sum_exp_weights(log_p)
-      T[K] = T[K-1] + wsample(supp,p)
-    end
+    # if T[K-1]==(n-1)
+    #   T[K] = n
+    # else
+    #   supp = 1:min(n - T[K-1] - 1, PP_partial[K-1] - T[K-1] + 1)
+    #   log_p = zeros(Float64,size(supp,1))
+    #   log_p += logpdf(ia_dist(T[K-1],K-1), supp.-zero_shift)
+    #   log_p += lbinom.(n .- T[K-1] .- supp, PP[K] - 1)
+    #   log_p += lgamma.(T[K-1] .+ supp .- K*alpha) .- lgamma.(T[K-1] .+ supp .- 1 .- (K-1)*alpha)
+    #   for s in supp
+    #     p_gt = 1. - cdf(ia_dist(T[K-1]+s,K),n-(T[K-1]+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
+    #     abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
+    #     log_p[s] += logpdf(ia_dist(T[K-1],K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
+    #   end
+    #   p = log_sum_exp_weights(log_p)
+    #   T[K] = T[K-1] + wsample(supp,p)
+    # end
+    T[K] = sample_final_arrival(T[K-1],K,n,ia_dist,zero_shift,PP_partial[K-1],PP[K],alpha)
 
     return T
 end
