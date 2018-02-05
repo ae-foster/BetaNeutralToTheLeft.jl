@@ -36,7 +36,7 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   N = 200
   ntl_alpha = 0.5
   crp_theta = 10.0
-  crp_alpha = 0.1
+  crp_alpha = 0.6
   # create intearrival distribution object and synthetic data
   interarrival_dist = CRP(crp_theta,crp_alpha)
   Z_data, PP_data, T_data = generateLabelSequence(N,ntl_alpha,interarrival_dist)
@@ -50,18 +50,18 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
   N = 200
   ntl_alpha = 0.5
-  p = 0.25
+  geom_p = 0.25
   # create intearrival distribution object and synthetic data
   interarrival_dist = Geometric
-  Z_data, PP_data, T_data = generateLabelSequence(N,ntl_alpha,interarrival_dist(p))
+  Z_data, PP_data, T_data = generateLabelSequence(N,ntl_alpha,interarrival_dist(geom_p))
 
-  gibbs_ia_params ? nothing : arrival_params_fixed = [p]
+  gibbs_ia_params ? nothing : arrival_params_fixed = [geom_p]
 
   # function check
   assert(all(PP_data .== seq2part(Z_data)))
   assert(all(T_data .== get_arrivals(Z_data)))
 
-elseif dataset_namem=="college msg"
+elseif dataset_name=="college msg"
   elist = readdlm("data/CollegeMsg.txt",Int64)
   Z_data = vec(elist[:,1:2]')
   PP_data = seq2part(Z_data)
@@ -102,7 +102,7 @@ w_alpha = 1.0 # slice sampling "window" parameter
 # Arrival time distribution settings
 ###########################################################################
 
-arrivals = "crp"
+arrivals = "geometric"
 
 if arrivals=="crp"
   include("crp.jl")
@@ -214,11 +214,18 @@ plot!(T_data,linecolor="black",lw=2)
 plot(alpha_gibbs,legend=false,lw=1.5)
 hline!([ntl_alpha],line=(2,:dash,2.0,[:black]))
 
-plot(ia_params_gibbs[1,:],legend=false,lw=1.5)
-hline!([crp_theta],line=(2,:dash,2.0,[:black]))
+if arrivals=="crp"
+  plot(ia_params_gibbs[1,:],legend=false,lw=1.5)
+  hline!([crp_theta],line=(2,:dash,2.0,[:black]))
+elseif arrivals=="geometric"
+  plot(ia_params_gibbs[1,:],legend=false,lw=1.5)
+  hline!([geom_p],line=(2,:dash,2.0,[:black]))
+end
 
-plot(ia_params_gibbs[2,:],legend=false,lw=1.5)
-hline!([crp_alpha],line=(2,:dash,2.0,[:black]))
+if arrivals=="crp"
+  plot(ia_params_gibbs[2,:],legend=false,lw=1.5)
+  hline!([crp_alpha],line=(2,:dash,2.0,[:black]))
+end
 
 plot(psi_gibbs,legend=false)
 

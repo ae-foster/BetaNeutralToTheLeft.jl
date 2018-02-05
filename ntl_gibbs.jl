@@ -653,11 +653,9 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
       log_p = zeros(Float64,size(supp,1))
       log_p += logpdf(ia_dist(T[j-1],j-1),supp.-zero_shift)
       log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
-      log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 - (j-1)*alpha)
+      log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
       for s in supp
-        log_p[s] = logpdf(ia_dist(T[j-1]+s,j),delta2 - (s-zero_shift))
-        # log_p[s] += lbinom(PP_partial[j] - T[j-1] - s, PP[j] - 1)
-        # log_p[s] += lgamma(T[j-1] + s - j*alpha) - lgamma(T[j-1] + s - 1 - (j-1)*alpha)
+        log_p[s] += logpdf(ia_dist(T[j-1]+s,j),delta2 - (s-zero_shift))
       end
       # sample an update
       p = log_sum_exp_weights(log_p)
@@ -676,9 +674,7 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
       for s in supp
         p_gt = 1. - cdf(ia_dist(T[K-1]+s,K),n-(T[K-1]+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
         abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
-        # log_p[s] = logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
-        # log_p[s] += lbinom(n - T[K-1] - s, PP[K] - 1)
-        # log_p[s] += lgamma(T[K-1] + s - K*alpha) - lgamma(T[K-1] + s - 1 - (K-1)*alpha)
+        log_p[s] += logpdf(ia_dist(T[K-1],K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
       end
       p = log_sum_exp_weights(log_p)
       T[K] = T[K-1] + wsample(supp,p)
@@ -695,7 +691,6 @@ function swap_elements!(x::Vector,i::Int,j::Int)
   return x
 end
 
-# needs to be tested (and made in-place)
 function update_block_order!(perm::Vector{Int},PP::Vector{Int},T::Vector{Int},alpha::Float64)
     """
     - `perm`: permutation of order of entries in `PP` (to be updated)
