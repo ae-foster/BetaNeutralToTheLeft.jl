@@ -2,13 +2,15 @@
 # Utilities for Gibbs updates
 ###########################################################################
 
+# using StatsBase
+using Distributions
+
 """
 to do:
   - conjugate interarrival distn --> posterior predictive updates (need to carry around T_{K+1})
   - CRP arrivals
 """
 
-# using StatsBase
 
 function logp_partition(PP::Vector{Int},T::Vector{Int},Psi::Vector{Float64},
         alpha::Float64,ia_dist::DiscreteDistribution,is_partition::Bool)
@@ -616,7 +618,7 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Functi
       supp = 1:(PP_partial[j-1] - T[j-1] + 1)
       # calculate pmf of conditional distribution
       log_p = zeros(Float64,size(supp,1))
-      log_p += logpdf(ia_dist(T[j-1],j-1),supp.-zero_shift)
+      log_p += logpdf.(ia_dist(T[j-1],j-1),supp.-zero_shift)
       log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
       log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
       # sample an update
@@ -651,7 +653,7 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
       supp = 1:min(delta2 - 1, PP_partial[j-1] - T[j-1] + 1)
       # calculate pmf of conditional distribution
       log_p = zeros(Float64,size(supp,1))
-      log_p += logpdf(ia_dist(T[j-1],j-1),supp.-zero_shift)
+      log_p += logpdf.(ia_dist(T[j-1],j-1),supp.-zero_shift)
       log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
       log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
       for s in supp
@@ -668,7 +670,7 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
     else
       supp = 1:min(n - T[K-1] - 1, PP_partial[K-1] - T[K-1] + 1)
       log_p = zeros(Float64,size(supp,1))
-      log_p += logpdf(ia_dist(T[K-1],K-1), supp.-zero_shift)
+      log_p += logpdf.(ia_dist(T[K-1],K-1), supp.-zero_shift)
       log_p += lbinom.(n .- T[K-1] .- supp, PP[K] - 1)
       log_p += lgamma.(T[K-1] .+ supp .- K*alpha) .- lgamma.(T[K-1] .+ supp .- 1 .- (K-1)*alpha)
       for s in supp
