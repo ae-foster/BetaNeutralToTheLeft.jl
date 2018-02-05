@@ -28,7 +28,8 @@ gibbs_perm_order = false   # order of blocks in partition/vertices in graph
 ############################################################################
 # need to add support for certain real data sets
 
-dataset_name = "synthetic crp"
+base_dir = "/data/flyrobin/foster/Documents/NTL.jl/"
+dataset_name = "synthetic geometric"
 
 if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   include("crp.jl")
@@ -65,6 +66,10 @@ elseif dataset_namem=="college msg"
   Z_data = vec(elist[:,1:2]')
   PP_data = seq2part(Z_data)
   T_data = get_arrivals(Z_data)
+
+elseif startswith(dataset_name, "sorted-")
+ # Assume that dataset_name is a filename
+  PP_data, T_data = parseSnapData("$base_dir$dataset_name")
 
 end
 
