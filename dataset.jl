@@ -61,6 +61,32 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
     z, dtm(m)
 end
 
+function parseSnapData(fname::String)
+    f = open(fname)
+    arrival_times = OrderedDict{String, Int}()
+    degrees = OrderedDict{String, Int}()
+    for (i, ln) in enumerate(eachline(f))
+        a = split(ln)
+        start = a[1]
+        terminal = a[2]
+        if ~haskey(arrival_times, start)
+            arrival_times[start] = 2*i - 1
+            degrees[start] = 1
+        else
+            degrees[start] += 1
+        end
+        if ~haskey(arrival_times, terminal)
+            arrival_times[terminal] = 2*i
+            degrees[terminal] = 1
+        else
+            degrees[terminal] += 1
+        end
+    end
+    T = collect(values(arrival_times))
+    PP = collect(values(degrees))
+    return PP, T
+end
+
 function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::DiscreteDistribution)
   ia_dist = (x,y) -> interarrival_dist
   generateInterarrivalTimes(TK,N,ia_dist)
@@ -103,7 +129,7 @@ end
 
 function generateLabelSequence(N::Int, alpha::Float64,
         interarrival_dist::DiscreteDistribution)
-    ia_diat = (x,y) -> interarrival_dist
+    ia_dist = (x,y) -> interarrival_dist
     generateLabelSequence(N,alpha,ia_dist)
 end
 
