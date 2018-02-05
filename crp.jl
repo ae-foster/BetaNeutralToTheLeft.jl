@@ -1,4 +1,5 @@
 ##### Chinese Restaurant Process arrival time utilities
+# using Optim
 
 type CRPinterarrival <: DiscreteUnivariateDistribution
   theta::Float64
@@ -22,8 +23,9 @@ function CRP(a...)
   partial(CRPinterarrival,a...)
 end
 
-Distributions.logpdf(s::CRPinterarrival,x::Int64) = _logpdf(s,x)
-function _logpdf(s::CRPinterarrival,x::Int64)
+Distributions.logpdf(s::CRPinterarrival,x::Int) = _logpdf(s,x)
+Distributions.logpdf(s::CRPinterarrival,v::Vector{Int}) = _logpdf_batch(s,v)
+function _logpdf(s::CRPinterarrival,x::Int)
   ka = s.k*s.alpha
   nt = s.n + s.theta
   logp = log(s.theta + ka) - log(nt)
@@ -34,6 +36,30 @@ function _logpdf(s::CRPinterarrival,x::Int64)
     end
   end
   return logp
+end
+
+function _logpdf_batch(s::CRPinterarrival,v::Vector{Int})
+  vmax = maximum(v)
+  vmin = minimum(v)
+  n = size(v,1)
+  idx_all = 1:n
+  idx_j = trues(n)
+  ret = zeros(Float64,n)
+
+  ka = s.k*s.alpha
+  nt = s.n + s.theta
+  nka = s.n - ka
+  logp = log(s.theta + ka) - log(nt)
+  for j in 1:vmax
+    j > 1 ? logp += log(nka + j - 2) - log(nt + j - 1) : nothing
+    for i in idx_all[idx_j]
+      if v[i]==j
+        ret[i] = logp
+        idx_j[i] = false
+      end
+    end
+  end
+  return ret
 end
 
 Distributions.pdf(s::CRPinterarrival,x::Int) = _pdf(s,x)
@@ -154,6 +180,51 @@ function update_crp_interarrival_params!(ia_params::Vector{Float64},T::Vector{In
   ia_params[2] = (exp(alpha_trans_ss) + max(0,-ia_params[1]))/(1 + exp(alpha_trans_ss))
 
 end
+
+function crp_theta_loglik(theta::Float64,alpha::Float64,K::Int,n::Int)
+  return sum( log.(theta .+ (1:(K-1)).*alpha) ) - sum( log.(theta .+ (1:(n-1))) )
+end
+
+function grad_crp_theta_loglik(theta::Float64,alpha::Float64,K::Int,n::Int)
+  return sum( 1./(theta .+ (1:(K-1)).*alpha) ) - sum( 1./(theta .+ (1:(n-1))) )
+end
+
+function hess_crp_theta_loglik(theta::Float64,alpha::Float64,K::Int,n::Int)
+  return -sum( 1./(theta .+ (1:(K-1)).*alpha).^2 ) + sum( 1./(theta .+ (1:(n-1))).^2 )
+end
+
+# function crp_theta_mle(alpha::Float64,K::Int,n::Int)
+#
+#   f(x) = -crp_theta_loglik(x[1],alpha,K,n)
+#   # f(x) = -crp_theta_logpdf(x[1],alpha,K,n,x->logpdf(Gamma(1,1),x+alpha))
+#   function g!(storage, x)
+#     storage[1] = -grad_crp_theta_loglik(x[1],alpha,K,n)
+#   end
+#   function fg!(storage, x)
+#     g!(storage,x)
+#     return f(x)
+#   end
+#   # function h!(storage, x)
+#   #   storage[1] = -hess_crp_theta_loglik(x[1],alpha,K,n)
+#   # end
+#   lower = [0.]
+#   upper = [Inf]
+#   initial_theta = [1.0]
+#   od = OnceDifferentiable(f, g!)
+#   # optimize(od, initial_theta, lower, upper, Fminbox())
+#   ## problems here
+#   return Optim.minimizer(optimize(od, initial_theta, lower, upper, Fminbox()))
+#
+# end
+
+# function initialize_crp_params(K::Int,n::Int,alpha_prior::UnivariateDistribution)
+#
+#   alpha = rand(alpha_prior)
+#   theta = crp_theta_mle(alpha,K,n)
+#
+#   return [theta; alpha]
+#
+# end
 
 function initialize_crp_params(theta_prior::UnivariateDistribution,alpha_prior::UnivariateDistribution)
   alpha = rand(alpha_prior)

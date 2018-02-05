@@ -56,6 +56,7 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},Psi::Vector{Float64},
 
 end
 
+# memoize this?
 function lbinom(n::Int,k::Int)
     """
     compues log of binomial coefficient {`n` choose `k`}
@@ -439,7 +440,7 @@ function cppf_arrivals(T::Vector{Int},n::Int,alpha::Float64)
     helper function for `log_CPPF` and `update_label_sequence`
     """
     K = size(T,1)
-    ret = -lgamma(n - K*alpha) + sum( lgamma.(T - (1:K).*alpha) ) - sum( lgamma(T[2:end] .- 1 - (0:(K-1)).*alpha) )
+    ret = -lgamma(n - K*alpha) + sum( lgamma.(T - (1:K).*alpha) ) - sum( lgamma.(T[2:end] .- 1 - (0:(K-1)).*alpha) )
     return ret
 end
 
@@ -615,11 +616,9 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Functi
       supp = 1:(PP_partial[j-1] - T[j-1] + 1)
       # calculate pmf of conditional distribution
       log_p = zeros(Float64,size(supp,1))
-      for s in supp
-        log_p[s] = logpdf(ia_dist(T[j-1],j-1),s-zero_shift)
-        log_p[s] += lbinom(PP_partial[j] - T[j-1] - s, PP[j] - 1)
-        log_p[s] += lgamma(T[j-1] + s - j*alpha) - lgamma(T[j-1] + s - 1 - (j-1)*alpha)
-      end
+      log_p += logpdf(ia_dist(T[j-1],j-1),supp.-zero_shift)
+      log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
+      log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
       # sample an update
       p = log_sum_exp_weights(log_p)
       T[j] = T[j-1] + wsample(supp,p)
@@ -652,10 +651,13 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
       supp = 1:min(delta2 - 1, PP_partial[j-1] - T[j-1] + 1)
       # calculate pmf of conditional distribution
       log_p = zeros(Float64,size(supp,1))
+      log_p += logpdf(ia_dist(T[j-1],j-1),supp.-zero_shift)
+      log_p += lbinom.(PP_partial[j] .- T[j-1] .- supp, PP[j] - 1)
+      log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 - (j-1)*alpha)
       for s in supp
-        log_p[s] = logpdf(ia_dist(T[j-1]+s,j),delta2 - (s-zero_shift)) + logpdf(ia_dist(T[j-1],j-1),s-zero_shift)
-        log_p[s] += lbinom(PP_partial[j] - T[j-1] - s, PP[j] - 1)
-        log_p[s] += lgamma(T[j-1] + s - j*alpha) - lgamma(T[j-1] + s - 1 - (j-1)*alpha)
+        log_p[s] = logpdf(ia_dist(T[j-1]+s,j),delta2 - (s-zero_shift))
+        # log_p[s] += lbinom(PP_partial[j] - T[j-1] - s, PP[j] - 1)
+        # log_p[s] += lgamma(T[j-1] + s - j*alpha) - lgamma(T[j-1] + s - 1 - (j-1)*alpha)
       end
       # sample an update
       p = log_sum_exp_weights(log_p)
@@ -668,12 +670,15 @@ function update_arrival_times!(T::Vector{Int},PP::Vector{Int},alpha::Float64,ia_
     else
       supp = 1:min(n - T[K-1] - 1, PP_partial[K-1] - T[K-1] + 1)
       log_p = zeros(Float64,size(supp,1))
+      log_p += logpdf(ia_dist(T[K-1],K-1), supp.-zero_shift)
+      log_p += lbinom.(n .- T[K-1] .- supp, PP[K] - 1)
+      log_p += lgamma.(T[K-1] .+ supp .- K*alpha) .- lgamma.(T[K-1] .+ supp .- 1 .- (K-1)*alpha)
       for s in supp
         p_gt = 1. - cdf(ia_dist(T[K-1]+s,K),n-(T[K-1]+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
-        abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0 ? nothing : log_p[s] += log(p_gt)
-        log_p[s] = logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
-        log_p[s] += lbinom(n - T[K-1] - s, PP[K] - 1)
-        log_p[s] += lgamma(T[K-1] + s - K*alpha) - lgamma(T[K-1] + s - 1 - (K-1)*alpha)
+        abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
+        # log_p[s] = logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
+        # log_p[s] += lbinom(n - T[K-1] - s, PP[K] - 1)
+        # log_p[s] += lgamma(T[K-1] + s - K*alpha) - lgamma(T[K-1] + s - 1 - (K-1)*alpha)
       end
       p = log_sum_exp_weights(log_p)
       T[K] = T[K-1] + wsample(supp,p)

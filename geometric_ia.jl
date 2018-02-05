@@ -21,6 +21,18 @@ function update_geometric_interarrival_param!(p::Vector{Float64},T::Vector{Int},
     - `a`,`b`: parameters of prior Beta distribution
     """
     K = size(T,1)
+    update_geometric_interarrival_param!(p,K,n,params)
+
+end
+
+function update_geometric_interarrival_param!(p::Vector{Float64},K::Int,n::Int,params::Vector{Float64})
+    """
+    - `p`: current geometric parameter for the interarrival time distribution
+    - `K`: number of blocks in partition (=# of arrivals)
+    - `n`: number of observations
+    - `a`,`b`: parameters of prior Beta distribution
+    """
+    # K = size(T,1)
     # sample pseudo arrival K+1 (given p, doesn't affect distribution of other arrival times)
     T_Kp1 = rand(Geometric(p[1])) + n
     # sample conjugate p

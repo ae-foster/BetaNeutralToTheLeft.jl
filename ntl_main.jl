@@ -12,14 +12,14 @@ include("slice.jl")
 ###########################################################################
 n_iter = 10000  # total number of Gibbs iterations to run
 n_burn = 5000   # burn-in
-n_thin = 10     # collect every `n_thin` samples
+n_thin = 100     # collect every `n_thin` samples
 
 # set which components to update
 gibbs_psi = true            # NTL Ψ paramters
 gibbs_alpha = true          # NTL alpha parameter
 gibbs_arrival_times = true  # arrival times
 gibbs_ia_params = true     # arrival time distribution parameters
-gibbs_perm_order = true   # order of blocks in partition/vertices in graph
+gibbs_perm_order = false   # order of blocks in partition/vertices in graph
 
 ## SET SEED
 
@@ -60,6 +60,12 @@ elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interar
   assert(all(PP_data .== seq2part(Z_data)))
   assert(all(T_data .== get_arrivals(Z_data)))
 
+elseif dataset_namem=="college msg"
+  elist = readdlm("data/CollegeMsg.txt",Int64)
+  Z_data = vec(elist[:,1:2]')
+  PP_data = seq2part(Z_data)
+  T_data = get_arrivals(Z_data)
+
 end
 
 # sort partition if necessary
@@ -76,6 +82,7 @@ gibbs_alpha ? nothing : alpha_fixed = ntl_alpha
 ###########################################################################
 # NTL alpha settings
 ###########################################################################
+
 ntl_gamma_a = 1.
 ntl_gamma_b = 1.
 
@@ -86,11 +93,11 @@ ntl_alpha_log_prior = x -> logpdf(ntl_alpha_prior_dist,x)
 
 w_alpha = 1.0 # slice sampling "window" parameter
 
-
 ###########################################################################
 # Arrival time distribution settings
 ###########################################################################
-arrivals = "geometric"
+
+arrivals = "crp"
 
 if arrivals=="crp"
   include("crp.jl")
@@ -153,21 +160,17 @@ gibbs_perm_order ? perm_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) :
 
 # initialize
 gibbs_psi ? psi_current = 0.5*ones(Float64,K) : nothing
-
 gibbs_alpha ? alpha_current = initialize_alpha(ntl_alpha_prior_dist) : alpha_current = [alpha_fixed]
-
 if gibbs_ia_params
   arrival_params_current = initialize_arrival_params(ia_prior_params)
 else
   arrival_params_current = arrival_params_fixed
 end
-
 if gibbs_arrival_times
   T_current = initialize_arrival_times(PP,alpha_current[1],ia_dist(arrival_params_current))
 else
   T_current = T_data
 end
-
 perm_current = collect(1:K) # initial permutation order
 
 # Gibbs sampler
@@ -191,9 +194,30 @@ for s in 1:n_iter
 end
 
 ############################################################################
-# end
+# end of Gibbs sampling code
 ############################################################################
 
+############################################################################
+# some plots to check for parameter recovery
+############################################################################
+using Plots
+gr()
+
+plot(T_gibbs,legend=false)
+plot!(T_data,linecolor="black",lw=2)
+
+plot(alpha_gibbs,legend=false,lw=1.5)
+hline!([ntl_alpha],line=(2,:dash,2.0,[:black]))
+
+plot(ia_params_gibbs[1,:],legend=false,lw=1.5)
+hline!([crp_theta],line=(2,:dash,2.0,[:black]))
+
+plot(ia_params_gibbs[2,:],legend=false,lw=1.5)
+hline!([crp_alpha],line=(2,:dash,2.0,[:black]))
+
+plot(psi_gibbs,legend=false)
+
+# scatter(PP_data,psi_gibbs,legend=false)
 
 # psi_consistent = (PP_syn.-1)./cumsum(PP_syn)
 # psi_mle = (PP_syn.-1)./(cumsum(PP_syn).-T_syn)
@@ -201,76 +225,3 @@ end
 # psi_map[1] = 1
 # psi_mean_gibbs = mean(psi_gibbs,2)
 # plot(psi_map.-psi_mean_gibbs,lw=2)
-
-##############################
-# Gibbs sampler when observing an arbitrarily ordered partition (but not arrivals)
-# ***** need to make this able to handle general interarrival distribution/updates
-function gibbs_partition(n_iter::Int,n_burn::Int,n_thin::Int,
-  PP_sorted::Vector{Int},alpha::Float64,ia_dist,a::Float64,b::Float64)
-
-  K = size(PP_sorted,1)
-  N = sum(PP_sorted)
-  # pre-allocate
-  psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin)))
-  T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin)))
-  sigma_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin)))
-  p_gibbs = zeros(Float64,Int(ceil((n_iter-n_burn)/n_thin)))
-  # initialize
-  psi_current = 0.5*ones(Float64,K)
-  p_current = rand(Beta(a,b))
-  sigma_current = collect(1:K) # start in decreasing order
-  T_current = initialize_arrival_times(PP_sorted[sigma_current],alpha,ia_dist(p_current))
-  ct_gibbs = 0
-
-  for n in 1:n_iter
-    update_psi_parameters_partition!(psi_current,PP_sorted[sigma_current],alpha)
-    update_block_order!(sigma_current,PP_sorted,T_current,alpha)
-    update_arrival_times!(T_current,PP_sorted[sigma_current],alpha,ia_dist(p_current))
-    p_current = update_geometric_interarrival_param_partition(p_current,K,N,a,b)
-    if (n > n_burn) && mod(n - n_burn,n_thin)==0
-      ct_gibbs += 1
-      psi_gibbs[:,ct_gibbs] = psi_current
-      sigma_gibbs[:,ct_gibbs] = sigma_current
-      T_gibbs[:,ct_gibbs] = T_current
-      p_gibbs[ct_gibbs] = p_current
-    end
-
-  end
-
-  return psi_gibbs,T_gibbs,p_gibbs,sigma_gibbs
-
-
-end
-
-N = 2000
-alpha = -10.
-p = 0.25
-
-# create intearrival distribution object and synthetic data
-interarrival_dist = Geometric
-Z_syn, PP_syn, T_syn = generateLabelSequence(N,alpha,interarrival_dist(p))
-
-K = size(PP_syn,1)
-
-n_gibbs = 20000
-n_burn = 15000
-n_thin = 1
-a_beta = 1.
-b_beta = 1.
-PP_sorted = sort(PP_syn,rev=true)
-@time psi_gibbs,T_gibbs,p_gibbs,sigma_gibbs =
-  gibbs_partition(n_gibbs,n_burn,n_thin,PP_sorted,alpha,interarrival_dist,a_beta,b_beta)
-
-#
-
-#
-# median_order = median(sigma_gibbs,2)
-p_order = [0.05; 0.25; 0.5; 0.75; 0.95]
-quantile_order = zeros(Float64,size(p_order,1),size(sigma_gibbs,1))
-for q in 1:size(p_order,1)
-  for k in 1:K
-    quantile_order[q,k] = quantile(sigma_gibbs[k,:],p_order[q])
-  end
-end
-scatter(PP_sorted,quantile_order',legend=false)
-plot(quantile_order',legend=false)
