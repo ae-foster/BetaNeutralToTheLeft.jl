@@ -58,6 +58,47 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},Psi::Vector{Float64},
 
 end
 
+function logp_partition(PP::Vector{Int},T::Vector{Int},
+        alpha::Float64,ia_dist::DiscreteDistribution,is_partition::Bool)
+    f = (x,y) -> ia_dist
+    logp_partition(PP,T,alpha,f,is_partition)
+end
+
+function logp_partition(PP::Vector{Int},T::Vector{Int},
+        alpha::Float64,ia_dist::Function,is_partition::Bool)
+    """
+    - `PP`: vector of partition block sizes ordered by arrival time
+    - `T`: vector of arrival times
+    - `Psi`: vector of beta random variables (can be log(Psi))
+    - `alpha`: 'discount parameter' in size-biased reinforcement
+    - `ia_dist`: function that creates an interarrival distribution at fixed parameters
+    - `is_partition`: flag for computing binomial coefficients
+    """
+
+    # shift distributions with non-zero mass on zero
+    zero_shift = Int(minimum(ia_dist(1,1)) == 0)
+
+    PP_bar = cumsum(PP)
+    # pop!(PP_bar)
+    ia = T[2:end] .- T[1:(end-1)]
+
+    K = size(Psi,1)
+    idx = 1:(K-1)
+    N = sum(PP)
+
+    log_p = log_CPPF(PP,T,alpha)
+
+    N - T[end] > 0 ? log_p += log(1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift)) : nothing
+    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j])] for j in 2:K )
+    # include binomial coefficients if for a partition
+    if is_partition
+      log_p += sum([lbinom(PP_bar[j] - T[j],PP[j] - 1) for j in 2:K])
+    end
+
+    return log_p
+
+end
+
 # memoize this?
 function lbinom(n::Int,k::Int)
     """
@@ -428,22 +469,33 @@ function cycle_elements_right!(X::Array,start_idx::Int,end_idx::Int)
     return X
 end
 
-function cppf_counts(PP::Vector{Int},alpha::Float64)
+function log_cppf_counts(PP::Vector{Int},alpha::Float64)
     """
     helper function for `log_CPPF` and `update_label_sequence`
     """
-    lgam_1ma = lgamma(1 - alpha)
-    ret = sum( lgamma.(PP[PP.>1] .- alpha) .- lgam_1ma )
+    gt1 = PP .> 1
+    ret = sum( lgamma.(PP[gt1] .- alpha) ) - sum(gt1)*lgamma(1 - alpha)
     return ret
 end
 
-function cppf_arrivals(T::Vector{Int},n::Int,alpha::Float64)
+function log_cppf_arrivals(T::Vector{Int},alpha::Float64)
     """
     helper function for `log_CPPF` and `update_label_sequence`
     """
     K = size(T,1)
-    ret = -lgamma(n - K*alpha) + sum( lgamma.(T - (1:K).*alpha) ) - sum( lgamma.(T[2:end] .- 1 - (0:(K-1)).*alpha) )
+    ret = sum( lgamma.(T .- (2:K).*alpha) ) - sum( lgamma.(T[2:end] .- 1 .- (0:(K-1)).*alpha) )
     return ret
+end
+
+function log_cppf_arrivals(T::Vector{Int},arrival_offset::Int,alpha::Float64)
+  """
+  helper function for computing predictive log-probabilities
+
+  `arrival_offset=K` indicates that the first element of `T` corresponds to the
+    K-th arrival
+  """
+  K_end = arrival_offset - 1 + size(T,1)
+  ret sum( lgamma.(T .- (arrival_offset:K_end)*alpha) ) - sum( lgamma.(T .- 1 .- (arrival_offset-1):(K_end-1).*alpha) )
 end
 
 function log_CPPF(PP::Vector{Int},T::Vector{Int},alpha::Float64)
@@ -456,7 +508,7 @@ function log_CPPF(PP::Vector{Int},T::Vector{Int},alpha::Float64)
     n = sum(PP)
     K = size(T,1)
 
-    logp = cppf_arrivals(T,n,alpha) + cppf_counts(PP,alpha)
+    logp = -lgamma(n - K*alpha) + log_cppf_arrivals(T,alpha) + log_cppf_counts(PP,alpha)
     return logp
 end
 

@@ -49,7 +49,7 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   assert(all(T_data .== get_arrivals(Z_data)))
 
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
-  N = 200
+  N = 1000
   ntl_alpha = 0.5
   geom_p = 0.25
   # create intearrival distribution object and synthetic data
