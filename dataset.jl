@@ -66,18 +66,17 @@ function parseSnapData(fname::String)
     return PP, T
 end
 
-function trainTestSplitSnapData(fname::String, split::Float64=0.8)
-    if split < 1
-        N = countlines(open(fname))
-        split_n = round(N*split)
-        n_test = N - split_n
-    else
-        split_n=Inf
-        n_test = 0
-    end
+function trainTestSplitSnapData(fname::String, split_prop::Float64=0.8)
+    N = countlines(open(fname))
+    split_n = Int(round(N*split_prop))
+    n_test = N - split_n
+
     f = open(fname)
     arrival_times = OrderedDict{String, Int}()
     degrees = OrderedDict{String, Int}()
+    #scope
+    T = nothing
+    PP = nothing
     for (i, ln) in enumerate(eachline(f))
         a = split(ln)
         start = a[1]
@@ -100,7 +99,7 @@ function trainTestSplitSnapData(fname::String, split::Float64=0.8)
         end
     end
     # T_test restarts from 1 being the first observation of the test set
-    T_test = collect(values(arrival_times)) - n_split
+    T_test = collect(values(arrival_times)) - split_n
     T_test = T_test[T_test .> 0]
     # PP is a pure extension of PP
     PP_test = collect(values(degrees))
