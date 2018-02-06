@@ -7,7 +7,8 @@ function logjoint_derivative_Tj(x::Real, j::Int, alpha::Real, p::Distributions.B
     grad = digamma(x - j * alpha) # First terms of the product
     if j > 1
         grad += - digamma(x - 1 - (j - 1) * alpha)
-        grad += (j - 2) / (x - 1) - mean(p) # term from the Gamma approximation
+        # grad += (j - 2) / (x - 1) - mean(p) # term from the Gamma approximation
+        grad += - mean(p) # term from the Exponential approximation
     end
 
     grad += -digamma(nj_bar[j] - x + 1) # terms from combinatorial coefficient
