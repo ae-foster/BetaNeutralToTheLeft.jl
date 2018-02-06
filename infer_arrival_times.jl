@@ -26,7 +26,8 @@ function logjoint_derivative_alpha(x::Real, Tj, n::Int, Kn::Int, nj::Array{Int})
     vec = zeros(Float64, Kn)
     for j in 1:Kn
         vec[j] = -j*digamma(Tj[j] - j * alpha) - digamma(nj[j] - x)
-        vec[j] += (j-1)*digamma(Tj[j] - 1 - (j - 1) * x) + digamma(1 - x)
+        if j > 1 vec[j] += (j-1)*digamma(Tj[j] - 1 - (j - 1) * x) + digamma(1 - x) end
+        vec[j] += digamma(1 - x)
     end
     grad += sum(vec)
 
@@ -46,7 +47,7 @@ p = Beta(ap + Kn - 1, bp + n - 1)
 
 # Initialise point estimates
 alpha = 0.
-Tj = round(cumsum((n / Kn) * ones(Real, n)))
+Tj = round.(cumsum((n / Kn) * ones(Real, n)))
 
 # Optimisation hyperparameters
 nb_epochs = 1
@@ -59,13 +60,15 @@ for i in 1:nb_epochs
         # step for Tj, j=1,...,Kn
         old = Tj[j]
         grad = logjoint_derivative_Tj(Tj[j], j, alpha, p, nj_bar)
-        println("grad:", grad)
         Tj[j] += lr_Tj * logjoint_derivative_Tj(Tj[j], j, alpha, p, nj_bar)
+        if abs(grad) > 1.
+        println("grad:", grad)
         println("Tj[",j,"]=",old," | ",Tj[j])
+        end
         # if j > 10 break end
     end
     # step for alpha
-    alpha +=-lr_alpha * logjoint_derivative_alpha(alpha, Tj, n, Kn, nj)
+    alpha += lr_alpha * logjoint_derivative_alpha(alpha, Tj, n, Kn, nj)
 
     # Compute & print log joint ?
 end
