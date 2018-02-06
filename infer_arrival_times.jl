@@ -5,9 +5,10 @@ function logjoint_derivative_Tj(x::Real, j::Int, alpha::Real, p::Distributions.B
     # Compute the derivative of the log joint with respect to Tj
 
     grad = digamma(x - j * alpha) # First terms of the product
-    if j > 1 grad += - digamma(x - 1 - (j - 1) * alpha) end
-
-    grad += (j - 2) / (x - 1) - mean(p) # term from the Gamma approximation
+    if j > 1
+        grad += - digamma(x - 1 - (j - 1) * alpha)
+        grad += (j - 2) / (x - 1) - mean(p) # term from the Gamma approximation
+    end
 
     grad += -digamma(nj_bar[j] - x + 1) # terms from combinatorial coefficient
     if j > 1 grad += digamma(nj_bar[j-1] - x + 2) end
@@ -15,15 +16,15 @@ function logjoint_derivative_Tj(x::Real, j::Int, alpha::Real, p::Distributions.B
     grad
 end
 
-# function logjoint_derivative_alpha(x::Real, Tj::Array{Real}, n::Int, Kn::Int, nj_bar::Array{Int})
-function logjoint_derivative_alpha(x::Real, Tj, n::Int, Kn::Int, nj_bar::Array{Int})
+# function logjoint_derivative_alpha(x::Real, Tj::Array{Real}, n::Int, Kn::Int, nj::Array{Int})
+function logjoint_derivative_alpha(x::Real, Tj, n::Int, Kn::Int, nj::Array{Int})
     # Compute the derivative of the log joint with respect to alpha
 
     grad = Kn * digamma(n - Kn * x) # First term of the joint
 
     vec = zeros(Float64, Kn)
     for j in 1:Kn
-        vec[j] = -j*digamma(Tj[j] - j * alpha) - digamma(nj[j]) - digamma(nj[j] - x)
+        vec[j] = -j*digamma(Tj[j] - j * alpha) - digamma(nj[j] - x)
         vec[j] += (j-1)*digamma(Tj[j] - 1 - (j - 1) * x) + digamma(1 - x)
     end
     grad += sum(vec)
@@ -44,7 +45,7 @@ p = Beta(ap + Kn - 1, bp + n - 1)
 
 # Initialise point estimates
 alpha = 0.
-Tj = cumsum(round(n / Kn) * ones(Real, n))
+Tj = round(cumsum((n / Kn) * ones(Real, n)))
 
 # Optimisation hyperparameters
 nb_epochs = 1
@@ -63,7 +64,7 @@ for i in 1:nb_epochs
         # if j > 10 break end
     end
     # step for alpha
-    alpha +=-lr_alpha * logjoint_derivative_alpha(alpha, Tj, n, Kn, nj_bar)
+    alpha +=-lr_alpha * logjoint_derivative_alpha(alpha, Tj, n, Kn, nj)
 
     # Compute & print log joint ?
 end
