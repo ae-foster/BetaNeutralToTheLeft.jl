@@ -62,6 +62,19 @@ function getDocumentTermMatrixFromReviewsJson(filename::String)
 end
 
 function parseSnapData(fname::String)
+    PP, T, PP_test, T_test, n_test = trainTestSplitSnapData(fname, 1.0)
+    return PP, T
+end
+
+function trainTestSplitSnapData(fname::String, split::Float64=0.8)
+    if split < 1
+        N = countlines(open(fname))
+        split_n = round(N*split)
+        n_test = N - split_n
+    else
+        split_n=Inf
+        n_test = 0
+    end
     f = open(fname)
     arrival_times = OrderedDict{String, Int}()
     degrees = OrderedDict{String, Int}()
@@ -81,10 +94,17 @@ function parseSnapData(fname::String)
         else
             degrees[terminal] += 1
         end
+        if i == split_n
+            T = collect(values(arrival_times))
+            PP = collect(values(degrees))
+        end
     end
-    T = collect(values(arrival_times))
-    PP = collect(values(degrees))
-    return PP, T
+    # T_test restarts from 1 being the first observation of the test set
+    T_test = collect(values(arrival_times)) - n_split
+    T_test = T_test[T_test .> 0]
+    # PP is a pure extension of PP
+    PP_test = collect(values(degrees))
+    return PP, T, PP_test, T_test, n_test
 end
 
 function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::DiscreteDistribution)
