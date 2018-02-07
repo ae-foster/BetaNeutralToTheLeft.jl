@@ -98,12 +98,11 @@ function trainTestSplitSnapData(fname::String, split_prop::Float64=0.8)
             PP = collect(values(degrees))
         end
     end
-    # T_test restarts from 1 being the first observation of the test set
-    T_test = collect(values(arrival_times)) - split_n
-    T_test = T_test[T_test .> 0]
+    # T_test is a pure extension of T
+    T_test = collect(values(arrival_times))
     # PP is a pure extension of PP
     PP_test = collect(values(degrees))
-    return PP, T, PP_test, T_test, n_test
+    return PP, T, PP_test, T_test, 2*split_n, 2*n_test
 end
 
 function generateInterarrivalTimes(TK::Char, N::Int, interarrival_dist::DiscreteDistribution)

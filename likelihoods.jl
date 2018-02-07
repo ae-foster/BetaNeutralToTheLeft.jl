@@ -21,20 +21,20 @@ end
 function ntl_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
         dcounts::Vector{Int64}, ts::Vector{Int64}, K::Int64, Tend::Int64)
     """
-    Computes the log-likelihood of the data conditional on arrival times Tj.
+    Computes the log-likelihood of the data conditional on arrival times (Tj).
 
     # Arguments
     - `params::Vector{Float64}`: a length 1 array containing log(1-alpha),
       a transform on the NTL alpha parameter
     - `ds::Vector{Int64}`: a vector of the unique observed cluster sizes
-      (multiplicity should eb stored in dcounts)
+      (multiplicity should be stored in `dcounts`)
     - `dcounts::Vector{Int64}`: corresponding to `ds`, the number of times
       each cluster size occured in data. The orders of `dcounts` and `ds` must
       match
     - `ts::Vector{Int64}`: The vector of observed arrival times T1, ..., TK
        The first element will be 1.
     - `K::Int64`: the total number of clusters, K = length(ts)
-    - `Tend::Int64`: the termination time of the data, Tend = sum(ds'*dcounts)      
+    - `Tend::Int64`: the termination time of the data, Tend = ds'*dcounts
     """
     # For optim
     alpha = 1 - exp(params[1])
