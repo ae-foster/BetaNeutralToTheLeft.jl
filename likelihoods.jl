@@ -71,10 +71,10 @@ function neg_grad_ntl_llikelihood!(storage::Vector{Float64},
     storage[1] = -trans_correct * (glnum - gldenom)
 end
 
-function geom_llikelihood(g::Vector{Float64}, deltas::Vector{Int64})
+function geom_llikelihood(g::Vector{Float64}, deltas::Vector{Int64}, lag::Int64)
     # for optim
     g = exp(g[1])/(1+exp(g[1]))
-    return length(deltas)*log(g) + sum(deltas-1)*log(1-g)
+    return length(deltas)*log(g) + (sum(deltas-1)+lag)*log(1-g)
 end
 
 
@@ -86,9 +86,8 @@ function pyp_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
     if theta <= -tau
         return -Inf
     end
-
     lnum = -K*lgamma(1-tau) + dcounts' * lgamma.(ds - tau) + sum(log.(theta+tau*collect(1:(K-1))))
-    ldenom = sum( log.( 1:(Tend-1) + theta ) )
+    ldenom = sum( log.( (1:Tend-1) + theta ) )
 
     return lnum - ldenom
 end
