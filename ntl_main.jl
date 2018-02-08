@@ -4,6 +4,7 @@ using StatsBase
 using Memoize
 
 include("dataset.jl")
+include("crp.jl")
 include("ntl_gibbs.jl")
 include("slice.jl")
 include("evaluation.jl")
@@ -21,7 +22,7 @@ gibbs_psi = true            # NTL Ψ paramters
 gibbs_alpha = true          # NTL alpha parameter
 gibbs_arrival_times = true  # arrival times
 gibbs_ia_params = true     # arrival time distribution parameters
-gibbs_perm_order = false   # order of blocks in partition/vertices in graph
+gibbs_perm_order = true   # order of blocks in partition/vertices in graph
 
 ## SET SEED
 srand(0)
@@ -32,7 +33,7 @@ srand(0)
 # need to add support for certain real data sets
 
 base_dir = "/data/flyrobin/foster/Documents/NTL.jl/"
-dataset_name = "synthetic geometric"
+dataset_name = "dnc"
 
 if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   println("Synethsizing data.")
@@ -129,7 +130,7 @@ w_alpha = 2.0 # slice sampling "window" parameter
 # Arrival time distribution settings
 ###########################################################################
 
-arrivals = "geometric"
+arrivals = "crp"
 
 if arrivals=="crp"
   include("crp.jl")
@@ -184,11 +185,11 @@ end
 
 # pre-allocate sample arrays
 println("Initializing sampler.")
-gibbs_psi ? psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
-gibbs_arrival_times ? T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
-gibbs_alpha ? alpha_gibbs = zeros(Float64,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
-gibbs_ia_params ? ia_params_gibbs = zeros(Float64,n_ia_params,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
-gibbs_perm_order ? perm_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
+gibbs_psi ? psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin))) : psi_gibbs = []
+gibbs_arrival_times ? T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) : T_gibbs = []
+gibbs_alpha ? alpha_gibbs = zeros(Float64,Int(ceil((n_iter-n_burn)/n_thin))) : alpha_gibbs = []
+gibbs_ia_params ? ia_params_gibbs = zeros(Float64,n_ia_params,Int(ceil((n_iter-n_burn)/n_thin))) : ia_params_gibbs = []
+gibbs_perm_order ? perm_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) : perm_gibbs = []
 
 # initialize
 gibbs_psi ? psi_current = 0.5*ones(Float64,K) : nothing
@@ -199,7 +200,7 @@ else
   arrival_params_current = arrival_params_fixed
 end
 if gibbs_arrival_times
-  T_current = initialize_arrival_times(PP,alpha_current[1],ia_dist(arrival_params_current))
+  T_current = initialize_arrival_times(PP,alpha_current[1],Geometric((K-1)/(N-1)))
 else
   T_current = T_data
 end
@@ -221,11 +222,11 @@ for s in 1:n_iter
   # p_current = update_geometric_interarrival_param_partition(p_current,K,N,a,b)
   if (s > n_burn) && mod(s - n_burn,n_thin)==0
     ct_gibbs += 1 ;
-    gibbs_psi ? psi_gibbs[:,ct_gibbs] = psi_current : psi_gibbs = [] ;
-    gibbs_arrival_times ? T_gibbs[:,ct_gibbs] = T_current : T_gibbs = [] ;
-    gibbs_alpha ? alpha_gibbs[ct_gibbs] = alpha_current[1] : alpha_gibbs = [] ;
-    gibbs_ia_params ? ia_params_gibbs[:,ct_gibbs] = arrival_params_current : ia_params_gibbs = [] ;
-    gibbs_perm_order ? perm_gibbs[:,ct_gibbs] = perm_current : perm_gibbs = [] ;
+    gibbs_psi ? psi_gibbs[:,ct_gibbs] = psi_current : nothing ;
+    gibbs_arrival_times ? T_gibbs[:,ct_gibbs] = T_current : nothing ;
+    gibbs_alpha ? alpha_gibbs[ct_gibbs] = alpha_current[1] : nothing ;
+    gibbs_ia_params ? ia_params_gibbs[:,ct_gibbs] = arrival_params_current : nothing ;
+    gibbs_perm_order ? perm_gibbs[:,ct_gibbs] = perm_current : nothing ;
   end
   if mod(s,n_print)==0
     t_elapsed += toq();

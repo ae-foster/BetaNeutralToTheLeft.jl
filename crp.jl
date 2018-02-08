@@ -119,8 +119,8 @@ function crp_theta_logpdf(theta::Float64,alpha::Float64,k::Int,n::Int,log_prior:
     of `theta`
   """
   if theta <= -alpha
-    println("theta: ",theta,"  //  alpha: ",alpha)
-    error("Invalid theta! theta > -alpha must be satisfied.")
+    # println("theta: ",theta,"  //  alpha: ",alpha)
+    return -Inf
   end
   logp = log_prior(theta,alpha)
   for j in 1:(k-1)
@@ -151,8 +151,8 @@ function crp_alpha_logpdf(alpha::Float64,theta::Float64,T::Vector{Int},n::Int,lo
     of `alpha`
   """
   if theta <= -alpha
-    println("theta: ",theta,"  //  alpha: ",alpha)
-    error("Invalid alpha: theta > -alpha must be satisfied.")
+    # println("theta: ",theta,"  //  alpha: ",alpha)
+    return -Inf
   end
   k = size(T,1)
   logp = log_prior(alpha)

@@ -661,6 +661,9 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Functi
     PP_bar = cumsum(PP)
     n = PP_bar[end]
 
+    typeof(ia_dist(1,1))==CRPinterarrival ? crp = true : crp = false
+    crp ? crp_dist = ia_dist(1,1) : nothing
+
     T = zeros(Int,K)
     T[1] = 1
 
@@ -669,12 +672,17 @@ function initialize_arrival_times(PP::Vector{Int},alpha::Float64,ia_dist::Functi
       supp = 1:(PP_bar[j-1] - T[j-1] + 1)
       # calculate pmf of conditional distribution
       log_p = zeros(Float64,size(supp,1))
-      log_p += logpdf.(ia_dist(T[j-1],j-1),supp.-zero_shift)
+      if crp
+        log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha,T[j-1],j-1,supp.-zero_shift)
+      else
+        log_p += logpdf.(ia_dist(T[j-1],j-1),supp.-zero_shift)
+      end
       log_p += lbinom.(PP_bar[j] .- T[j-1] .- supp, PP[j] - 1)
       log_p += lgamma.(T[j-1] .+ supp .- j*alpha) .- lgamma.(T[j-1] .+ supp .- 1 .- (j-1)*alpha)
       # sample an update
       p = log_sum_exp_weights(log_p)
       T[j] = T[j-1] + wsample(supp,p)
+      # println("initialized T_",j,"=",T[j])
     end
 
     return T
