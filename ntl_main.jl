@@ -96,7 +96,6 @@ elseif dataset_name=="mathoverflow"
   # end
   PP_data = seq2part(Z_data)
   T_data = get_arrivals(Z_data)
-end
 
 elseif startswith(dataset_name, "sorted-")
  # Assume that dataset_name is a filename
