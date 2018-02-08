@@ -72,6 +72,18 @@ elseif dataset_name=="college msg"
   PP_data = seq2part(Z_data)
   T_data = get_arrivals(Z_data)
 
+elseif dataset_name=="dnc"
+  elist = readdlm("data/dnc-temporalGraph/out.dnc-temporalGraph",Int64,skipstart=1)
+  srt = vec(elist[sortperm(elist[:,4]),1:2]')
+  uq = unique(srt) # preserves input order
+  # relabel id's in time-sorted order
+  Z_data = zeros(Int64,size(srt,1))
+  for i in 1:size(uq,1)
+    Z_data[srt .== uq[i]] = i
+  end
+  PP_data = seq2part(Z_data)
+  T_data = get_arrivals(Z_data)
+
 elseif startswith(dataset_name, "sorted-")
  # Assume that dataset_name is a filename
   PP_data, T_data = parseSnapData("$base_dir$dataset_name")
