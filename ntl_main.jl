@@ -85,6 +85,19 @@ elseif dataset_name=="dnc"
   PP_data = seq2part(Z_data)
   T_data = get_arrivals(Z_data)
 
+elseif dataset_name=="mathoverflow"
+  Z_data = vec(readdlm("data/sx-mathoverflow-Z.txt",Int64))
+  # srt = vec(elist[sortperm(elist[:,3]),1:2]')
+  # uq = unique(srt) # preserves input order
+  # # relabel id's in time-sorted order
+  # Z_data = zeros(Int64,size(srt,1))
+  # for i in 1:size(uq,1)
+  #   Z_data[srt .== uq[i]] = i
+  # end
+  PP_data = seq2part(Z_data)
+  T_data = get_arrivals(Z_data)
+end
+
 elseif startswith(dataset_name, "sorted-")
  # Assume that dataset_name is a filename
   PP_data, T_data = parseSnapData("$base_dir$dataset_name")
@@ -252,6 +265,7 @@ gibbs_arrival_times ? T_diff = mean_arrival_time_Lp(T_gibbs,T_data,1.0) : nothin
 ############################################################################
 # some plots to check for parameter recovery
 ############################################################################
+#=
 using Plots
 gr()
 
@@ -286,3 +300,4 @@ plot(PP[perm_data],legend=false)
 # psi_map[1] = 1
 # psi_mean_gibbs = mean(psi_gibbs,2)
 # plot(psi_mle.-psi_mean_gibbs,lw=2)
+=#

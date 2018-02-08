@@ -77,6 +77,19 @@ function geom_llikelihood(g::Vector{Float64}, deltas::Vector{Int64}, lag::Int64)
     return length(deltas)*log(g) + (sum(deltas-1)+lag)*log(1-g)
 end
 
+function ntl_pyp_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
+        dcounts::Vector{Int64}, ts::Vector{Int64}, K::Int64, Tend::Int64)
+    # For optim
+    tau = exp(params[1])/(1+exp(params[1]))
+    theta = params[2]
+    alpha = params[3]
+    if theta <= -tau
+        return -Inf
+    end
+    lnum = lgamma(theta + 1) + sum( log.(theta .+ tau.*collect(1:(K-1))) ) + sum( lgamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
+    ldenom =  lgamma(theta + ts[end]) + sum( lgamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
+    return lnum - ldenom + ntl_llikelihood([alpha],ds,dcounts,ts,K,Tend)
+end
 
 function pyp_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
         dcounts::Vector{Int64}, ts::Vector{Int64}, K::Int64, Tend::Int64)
