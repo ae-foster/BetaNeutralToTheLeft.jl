@@ -7,21 +7,22 @@ include("likelihoods.jl")
 ## Download the unweighted datasets here https://snap.stanford.edu/data/#temporal
 ## gunzip <name>
 ## sort -k3 -n <name> > sorted-<name>
-
-json_output = "mle_results_80percent.json"
-split_prop = 0.8
+percent = ARGS[1]
+json_output = "mle_results_$(percent)percent.json"
+split_prop = parse(Float64, percent)/100
 results = Dict()
 dir = "/data/flyrobin/foster/Documents/NTL.jl/"
 for fname in readdir(dir)
     if startswith(fname, "sorted-")
         println(fname)
         results[fname] = Dict()
-        degs, ts, _, _, _, _ = trainTestSplitSnapData("$dir$fname", 0.8)
+        degs, ts, _, _, _, _ = trainTestSplitSnapData("$dir$fname", split_prop)
         Tend = sum(degs)
         dmap = countmap(degs)
         ds = collect(keys(dmap))
         dcounts = collect(values(dmap))
         deltas = ts[2:end] - ts[1:(end-1)]
+        lag=Tend-ts[end]
         K = sum(dcounts)
 
         println("\nPYP")
@@ -48,10 +49,9 @@ for fname in readdir(dir)
         println("NTL alpha ", alpha)
         results[fname]["NTL"]["alpha"] = alpha
         ll = result.minimum
-        result = optimize(g -> -geom_llikelihood(g, deltas), [.5], LBFGS())
-        println("g ", exp(result.minimizer[1])/(1+exp(result.minimizer[1])))
-        g = length(degs)/sum(degs)
-        println("g analytically ", g)
+        result = optimize(g -> -geom_llikelihood(g, deltas, lag), [.5], LBFGS())
+        g = exp(result.minimizer[1])/(1+exp(result.minimizer[1]))
+        println("g ", g)
         results[fname]["NTL"]["g"] = g
         ll += result.minimum
         println("Optimized ll ", -ll)
@@ -62,5 +62,7 @@ for fname in readdir(dir)
     end
 end
 open(json_output, "w") do f
+    println("Writing to file ", json_output)
     write(f, JSON.json(results))
+    println("Success")
 end
