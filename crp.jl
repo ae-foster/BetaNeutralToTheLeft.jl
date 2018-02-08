@@ -26,11 +26,15 @@ end
 Distributions.logpdf(s::CRPinterarrival,x::Int) = _logpdf(s,x)
 Distributions.logpdf(s::CRPinterarrival,v::Vector{Int}) = _logpdf_batch(s,v)
 function _logpdf(s::CRPinterarrival,x::Int)
-  ka = s.k*s.alpha
-  nt = s.n + s.theta
-  logp = log(s.theta + ka) - log(nt)
+  return crp_logpdf(s.theta,s.alpha,s.n,s.k,x)
+end
+
+function crp_logpdf(theta::Float64,alpha::Float64,n::Int,k::Int,x::Int)
+  ka = k*alpha
+  nt = n + theta
+  logp = log(theta + ka) - log(nt)
   if x > 1
-    nka = s.n - ka
+    nka = n - ka
     for i in 2:x
       logp += log(nka + i - 2) - log(nt + i - 1)
     end
@@ -38,18 +42,19 @@ function _logpdf(s::CRPinterarrival,x::Int)
   return logp
 end
 
-function _logpdf_batch(s::CRPinterarrival,v::Vector{Int})
+function crp_logpdf(theta::Float64,alpha::Float64,n::Int,k::Int,v::Vector{Int})
+  # for a vector of evaluation points
   vmax = maximum(v)
   vmin = minimum(v)
-  n = size(v,1)
-  idx_all = 1:n
-  idx_j = trues(n)
-  ret = zeros(Float64,n)
+  nv = size(v,1)
+  idx_all = 1:nv
+  idx_j = trues(nv)
+  ret = zeros(Float64,nv)
 
-  ka = s.k*s.alpha
-  nt = s.n + s.theta
-  nka = s.n - ka
-  logp = log(s.theta + ka) - log(nt)
+  ka = k*alpha
+  nt = n + theta
+  nka = n - ka
+  logp = log(theta + ka) - log(nt)
   for j in 1:vmax
     j > 1 ? logp += log(nka + j - 2) - log(nt + j - 1) : nothing
     for i in idx_all[idx_j]
@@ -62,6 +67,10 @@ function _logpdf_batch(s::CRPinterarrival,v::Vector{Int})
   return ret
 end
 
+function _logpdf_batch(s::CRPinterarrival,v::Vector{Int})
+  return crp_logpdf(s.theta,s.alpha,s.n,s.k,v)
+end
+
 Distributions.pdf(s::CRPinterarrival,x::Int) = _pdf(s,x)
 function _pdf(s::CRPinterarrival,x::Int)
   return exp.(logpdf(s,x))
@@ -69,11 +78,15 @@ end
 
 Distributions.cdf(s::CRPinterarrival,x::Int64) = _cdf(s,x)
 function _cdf(s::CRPinterarrival,x::Int64)
-  ka = s.k*s.alpha
-  nt = s.n + s.theta
-  P1 = (s.theta + ka)/(nt)
+  return crp_cdf(s.theta,s.alpha,s.n,s.k,x)
+end
+
+function crp_cdf(theta::Float64,alpha::Float64,n::Int,k::Int,x::Int)
+  ka = k*alpha
+  nt = n + theta
+  P1 = (theta + ka)/(nt)
   if x > 1
-    nka = s.n - ka
+    nka = n - ka
     prev = P1
     P = 0
     for j in 2:x
@@ -106,6 +119,7 @@ function crp_theta_logpdf(theta::Float64,alpha::Float64,k::Int,n::Int,log_prior:
     of `theta`
   """
   if theta <= -alpha
+    println("theta: ",theta,"  //  alpha: ",alpha)
     error("Invalid theta! theta > -alpha must be satisfied.")
   end
   logp = log_prior(theta,alpha)
@@ -137,6 +151,7 @@ function crp_alpha_logpdf(alpha::Float64,theta::Float64,T::Vector{Int},n::Int,lo
     of `alpha`
   """
   if theta <= -alpha
+    println("theta: ",theta,"  //  alpha: ",alpha)
     error("Invalid alpha: theta > -alpha must be satisfied.")
   end
   k = size(T,1)
@@ -228,7 +243,7 @@ end
 
 function initialize_crp_params(theta_prior::UnivariateDistribution,alpha_prior::UnivariateDistribution)
   alpha = rand(alpha_prior)
-  theta = rand(theta_prior) - alpha
+  theta = rand(theta_prior)
   return [theta; alpha]
 
 end

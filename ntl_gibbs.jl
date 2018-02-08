@@ -3,7 +3,7 @@
 ###########################################################################
 
 # using StatsBase
-using Distributions
+# using Distributions
 
 """
 to do:
@@ -494,7 +494,7 @@ function log_cppf_arrivals(T::Vector{Int},arrival_offset::Int,alpha::Float64)
     K-th arrival
   """
   K_end = arrival_offset - 1 + size(T,1)
-  return sum( lgamma.(T .- (arrival_offset:K_end)*alpha) ) - sum( lgamma.(T .- 1 .- (arrival_offset-1):(K_end-1).*alpha) )
+  return sum( lgamma.(T .- (arrival_offset:K_end).*alpha) ) - sum( lgamma.(T .- 1 .- (arrival_offset-1):(K_end-1).*alpha) )
 end
 
 function log_CPPF(PP::Vector{Int},T::Vector{Int},alpha::Float64)
@@ -687,15 +687,30 @@ function sample_interarrival(j::Int,T_jm1::Int,T_jp1::Int,ia_dist::Function,
     (j,T[j-1],T[j+1],ia_dist,zero_shift,PP_bar[j-1],PP[j],alpha)
   """
   delta2 = T_jp1 - T_jm1
+  # check to see if interarrivals are Geometric or CRP to short-cut some computtions
+  typeof(ia_dist(1,1))==Distributions.Geometric{Float64} ? geom = true : geom = false
+  typeof(ia_dist(1,1))==CRPinterarrival ? crp = true : crp = false
+  crp ? crp_dist = ia_dist(1,1) : nothing
+
   # determine support
   supp = 1:min(delta2 - 1, PP_bar_jm1 - T_jm1 + 1)
   # calculate pmf of conditional distribution
   log_p = zeros(Float64,size(supp,1))
-  log_p += logpdf(ia_dist(T_jm1,j-1),supp.-zero_shift)
+  if crp
+    log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1,j-1,supp.-zero_shift)
+  elseif !geom # geometric interarrival prior is memoryless => doesn't contribute
+    log_p += logpdf(ia_dist(T_jm1,j-1),supp.-zero_shift)
+  end
   log_p += lbinom.(PP_bar_jm1 .+ PP_j .- T_jm1 .- supp, PP_j - 1)
   log_p += lgamma.(T_jm1 .+ supp .- j*alpha) .- lgamma.(T_jm1 .+ supp .- 1 .- (j-1)*alpha)
-  for s in supp
-    log_p[s] += logpdf(ia_dist(T_jm1+s,j),delta2 - (s-zero_shift))
+  if !geom
+    for s in supp
+      if crp
+        log_p[s] += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1+s,j,delta2 - (s-zero_shift))
+      else
+        log_p[s] += logpdf(ia_dist(T_jm1+s,j),delta2 - (s-zero_shift))
+      end
+    end
   end
   # sample an update
   p = log_sum_exp_weights(log_p)
@@ -708,15 +723,32 @@ function sample_final_arrival(T_Km1::Int,K::Int,n::Int,ia_dist::Function,
   if T_Km1==(n-1)
     TK = n
   else
+    typeof(ia_dist(1,1))==Distributions.Geometric{Float64} ? geom = true : geom = false
+    typeof(ia_dist(1,1))==CRPinterarrival ? crp = true : crp = false
+    crp ? crp_dist = ia_dist(1,1) : nothing
+
     supp = 1:min(n - T_Km1 - 1, PP_bar_Km1 - T_Km1 + 1)
     log_p = zeros(Float64,size(supp,1))
-    log_p += logpdf(ia_dist(T_Km1,K-1), supp.-zero_shift)
+
+    if crp
+      log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha, T_Km1, K-1, supp.-zero_shift)
+    elseif !geom
+      log_p += logpdf(ia_dist(T_Km1,K-1), supp.-zero_shift)
+    end
+
     log_p += lbinom.(n .- T_Km1 .- supp, PP_K - 1)
     log_p += lgamma.(T_Km1 .+ supp .- K*alpha) .- lgamma.(T_Km1 .+ supp .- 1 .- (K-1)*alpha)
-    for s in supp
-      p_gt = 1. - cdf(ia_dist(T_Km1+s,K),n-(T_Km1+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
-      abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
-      log_p[s] += logpdf(ia_dist(T_Km1,K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
+    if !geom
+      for s in supp
+        if crp
+          log_p[s] += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_Km1,K-1, s-zero_shift)
+          p_gt = 1. - crp_cdf(crp_dist.theta,crp_dist.alpha,T_Km1+s,K,n-(T_Km1+s-zero_shift))
+        else
+          log_p[s] += logpdf(ia_dist(T_Km1,K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
+          p_gt = 1. - cdf(ia_dist(T_Km1+s,K),n-(T_Km1+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
+        end
+        abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
+      end
     end
     p = log_sum_exp_weights(log_p)
     TK = T_Km1 + wsample(supp,p)

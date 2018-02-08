@@ -1,6 +1,7 @@
 # Gibbs samplers for Beta NTL models of partitions, graphs, mixtures
 using Distributions
 using StatsBase
+using Memoize
 
 include("dataset.jl")
 include("ntl_gibbs.jl")
@@ -11,8 +12,8 @@ include("evaluation.jl")
 ###########################################################################
 # Gibbs sampler settings
 ###########################################################################
-n_iter = 10000  # total number of Gibbs iterations to run
-n_burn = 5000   # burn-in
+n_iter = 50000  # total number of Gibbs iterations to run
+n_burn = 1000   # burn-in
 n_thin = 100     # collect every `n_thin` samples
 
 # set which components to update
@@ -23,6 +24,7 @@ gibbs_ia_params = true     # arrival time distribution parameters
 gibbs_perm_order = false   # order of blocks in partition/vertices in graph
 
 ## SET SEED
+srand(0)
 
 ############################################################################
 # Data
@@ -33,8 +35,9 @@ base_dir = "/data/flyrobin/foster/Documents/NTL.jl/"
 dataset_name = "synthetic geometric"
 
 if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
+  println("Synethsizing data.")
   include("crp.jl")
-  N = 200
+  N = 1000
   ntl_alpha = 0.5
   crp_theta = 10.0
   crp_alpha = 0.6
@@ -49,6 +52,7 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   assert(all(T_data .== get_arrivals(Z_data)))
 
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
+  println("Synethsizing data.")
   N = 1000
   ntl_alpha = 0.5
   geom_p = 0.25
@@ -77,15 +81,23 @@ end
 # sort partition if necessary
 if gibbs_perm_order
   PP_sort = sortrows(hcat(PP_data,collect(1:size(PP_data,1))),rev=true)
+  # sort ties in ascending order of original order for plotting purposes
+  maxdeg = maximum(PP_sort)
+  for j in 1:maxdeg
+    PP_sort[PP_sort[:,1].==j,2] = sort(PP_sort[PP_sort[:,1].==j,2],rev=false)
+  end
   perm_data = PP_sort[:,2]
   PP = PP_sort[:,1]
 else
   PP = deepcopy(PP_data)
+  perm_data = collect(1:size(PP,1))
 end
 
 K = size(PP,1)
 N = sum(PP)
 gibbs_alpha ? nothing : alpha_fixed = ntl_alpha
+
+println("Finished pre-processing data.")
 
 ###########################################################################
 # NTL alpha settings
@@ -99,7 +111,7 @@ ntl_gamma_b = 1.
 ntl_alpha_prior_dist = Gamma(ntl_gamma_a,ntl_gamma_b)
 ntl_alpha_log_prior = x -> logpdf(ntl_alpha_prior_dist,x)
 
-w_alpha = 1.0 # slice sampling "window" parameter
+w_alpha = 2.0 # slice sampling "window" parameter
 
 ###########################################################################
 # Arrival time distribution settings
@@ -126,8 +138,8 @@ if arrivals=="crp"
   # slice sampling functions/parameters
   f_lp_t = (x,a) -> logpdf(Gamma(theta_gamma_a,theta_gamma_b),x+a)
   f_lp_a = x -> logpdf(Beta(alpha_beta_a,alpha_beta_b),x)
-  w_t = 1.0 # slice sampling w parameter for crp_theta
-  w_a = 1.0 # slice sampling w parameter for crp_alpha
+  w_t = 2.0 # slice sampling w parameter for crp_theta
+  w_a = 2.0 # slice sampling w parameter for crp_alpha
 
   # CRP-specific sampling functions
   initialize_arrival_params = v -> initialize_crp_params(Gamma(v[1],v[2]),Beta(v[3],v[4]))
@@ -159,6 +171,7 @@ end
 #   otherwise, it should be in arrival-order
 
 # pre-allocate sample arrays
+println("Initializing sampler.")
 gibbs_psi ? psi_gibbs = zeros(Float64,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
 gibbs_arrival_times ? T_gibbs = zeros(Int,K,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
 gibbs_alpha ? alpha_gibbs = zeros(Float64,Int(ceil((n_iter-n_burn)/n_thin))) : nothing
@@ -181,8 +194,13 @@ end
 perm_current = collect(1:K) # initial permutation order
 
 # Gibbs sampler
+n_print = 1000
 ct_gibbs = 0 # counts when to store state of Markov Chain
-@time for s in 1:n_iter
+
+t_elapsed = 0.
+println("Running Gibbs sampler.")
+tic();
+for s in 1:n_iter
   gibbs_psi ? update_psi_parameters_partition!(psi_current,PP[perm_current],alpha_current[1]) : nothing ;
   gibbs_arrival_times ? update_arrival_times!(T_current,PP[perm_current],alpha_current[1],ia_dist(arrival_params_current)) : nothing ;
   gibbs_alpha ? update_ntl_alpha!(alpha_current,PP[perm_current],T_current,ntl_alpha_log_prior,w_alpha) : nothing ;
@@ -191,14 +209,20 @@ ct_gibbs = 0 # counts when to store state of Markov Chain
   # p_current = update_geometric_interarrival_param_partition(p_current,K,N,a,b)
   if (s > n_burn) && mod(s - n_burn,n_thin)==0
     ct_gibbs += 1 ;
-    gibbs_psi ? psi_gibbs[:,ct_gibbs] = psi_current : nothing ;
-    gibbs_arrival_times ? T_gibbs[:,ct_gibbs] = T_current : nothing ;
-    gibbs_alpha ? alpha_gibbs[ct_gibbs] = alpha_current[1] : nothing ;
-    gibbs_ia_params ? ia_params_gibbs[:,ct_gibbs] = arrival_params_current : nothing ;
-    gibbs_perm_order ? perm_gibbs[:,ct_gibbs] = perm_current : nothing ;
+    gibbs_psi ? psi_gibbs[:,ct_gibbs] = psi_current : psi_gibbs = [] ;
+    gibbs_arrival_times ? T_gibbs[:,ct_gibbs] = T_current : T_gibbs = [] ;
+    gibbs_alpha ? alpha_gibbs[ct_gibbs] = alpha_current[1] : alpha_gibbs = [] ;
+    gibbs_ia_params ? ia_params_gibbs[:,ct_gibbs] = arrival_params_current : ia_params_gibbs = [] ;
+    gibbs_perm_order ? perm_gibbs[:,ct_gibbs] = perm_current : perm_gibbs = [] ;
   end
-
+  if mod(s,n_print)==0
+    t_elapsed += toq();
+    println("Finished with ",s," samples out of ",n_iter,". Elapsed time is ",t_elapsed," seconds.")
+    tic();
+  end
 end
+
+println("Finished running Gibbs sampler.")
 
 ############################################################################
 # end of Gibbs sampling code
@@ -239,11 +263,13 @@ end
 
 plot(psi_gibbs,legend=false)
 
+plot(PP[perm_data],legend=false)
+
 # scatter(PP_data,psi_gibbs,legend=false)
 
-# psi_consistent = (PP_syn.-1)./cumsum(PP_syn)
-# psi_mle = (PP_syn.-1)./(cumsum(PP_syn).-T_syn)
-# psi_map = (PP_syn.-1-alpha)./(cumsum(PP_syn).-(1:K).*alpha.-2)
+# psi_consistent = (PP.-1)./cumsum(PP)
+# psi_mle = (PP.-1)./(cumsum(PP).-T_data)
+# psi_map = (PP.-1-ntl_alpha)./(cumsum(PP).-(1:K).*ntl_alpha.-2)
 # psi_map[1] = 1
 # psi_mean_gibbs = mean(psi_gibbs,2)
-# plot(psi_map.-psi_mean_gibbs,lw=2)
+# plot(psi_mle.-psi_mean_gibbs,lw=2)
