@@ -25,6 +25,9 @@ for fname in readdir(dir)
         if startswith(fname, "sorted-stackoverflow.txt")
             continue
         end
+        if startswith(fname, "sorted-wiki-talk.txt")
+            continue
+        end
         println("$fname")
         results[fname] = Dict()
         PP, T, PP_test, T_test, n_train, n_test = trainTestSplitSnapData("$dir$fname", split_prop)
@@ -37,6 +40,7 @@ for fname in readdir(dir)
         deltas = T_test[2:end] - T_test[1:(end-1)]
         lag = Tend-T_test[end]
         K = sum(dcounts)
+        T_new = T_test[T_test .> n_train] - n_train
 
         #######################################################################
         # Prediction
@@ -53,7 +57,7 @@ for fname in readdir(dir)
         # Predictive log-likelihood
         predictive_ll = pyp_llikelihood([log(tau/(1-tau)), theta], ds, dcounts, T_test, K, Tend) - train_ll
         println("pll ", predictive_ll)
-        ben_pll = predictive_logprob(PP,T,PP_test,T_test,CRP(theta,tau),tau)
+        ben_pll = predictive_logprob(PP,T,PP_test,T_test,CRP(theta,tau),tau)[1]
         println("Ben pll ", ben_pll)
         results[fname]["PYP"]["pll"] = predictive_ll
 
@@ -68,7 +72,7 @@ for fname in readdir(dir)
         # Predictive log-likelihood
         predictive_ll = ntl_llikelihood([log(1-alpha)], ds, dcounts, T_test, K, Tend) + geom_llikelihood([log(g/(1-g))], deltas, lag) - train_ll
         println("Predictive ll ", predictive_ll)
-        ben_pll = predictive_logprob(PP,T,PP_test,T_test,(a,b)->Geometric(g),alpha)
+        ben_pll = predictive_logprob(PP,T,PP_test,T_test,(a,b)->Geometric(g),alpha)[1]
         println("Ben pll ", ben_pll)
         results[fname]["NTL"]["pll"] = predictive_ll
         println("\n")
@@ -101,12 +105,15 @@ for fname in readdir(dir)
         # println("NTL #new clusters ", length(ntl_predict) - length(PP))
         # println("pyp #new clusters ", length(pyp_predict) - length(PP))
         results[fname]["n_test"] = n_test
+        results[fname]["n_test"] = n_train
         results[fname]["true PP"] = PP_test
         results[fname]["true T"] = T_test
         results[fname]["NTL"]["PP"] = ntl_PP
         results[fname]["PYP"]["PP"] = pyp_PP
         results[fname]["NTL"]["T"] = ntl_T
         results[fname]["PYP"]["T"] = pyp_T
+
+        println("\n")
 
     end
 end
