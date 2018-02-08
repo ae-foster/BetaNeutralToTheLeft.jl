@@ -1,7 +1,7 @@
 using Plots
 using StatsBase
 include("dataset.jl")
-plotly()
+gr()
 
 ## Download the unweighted datasets here https://snap.stanford.edu/data/#temporal
 ## gunzip <name>
@@ -59,10 +59,11 @@ data_fitted_parameters = Dict(
 ))
 
 # dir = "/data/flyrobin/foster/Documents/NTL.jl/"
-dir = "data/"
-for fname in readdir(dir)
+plot_dir = "plots"
+data_dir = "data/"
+for fname in readdir(data_dir)
     if startswith(fname, "sorted-")
-        degs, ts = parseSnapData("$dir$fname")
+        degs, ts = parseSnapData("$data_dir$fname")
         fname = split(split(fname, ".txt")[1],"-")[end]
         println("\n$fname")
 
@@ -75,15 +76,20 @@ for fname in readdir(dir)
         ef = ecdf(degs)
         x = logspace(log(min(degs...)), log(max(degs...)), 100)
         output = [(1-ef(t)) for t in x]
-        p0 = Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10, label = "True data", line=(3))
+        p0 = Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10, label = "Data", line=(3))
         xmin = Int(data_fitted_parameters[fname]["xmin"])
-        a = -data_fitted_parameters[fname]["eta"] + 1
+        eta = data_fitted_parameters[fname]["eta"]
+        a = - eta + 1
         b = 1-ef(log10(xmin)) - a * log10(xmin)
-        lin_output = exp10.(a * log10.(x[output.>0]) + log10.(b))
 
-        Plots.plot!(p0, x[output.>0], lin_output, xscale=:log10, yscale=:log10, label = "Fit", line=(3,:dash))
-        Plots.plot!(p0, title=fname, xlabel="Node degree", ylabel="Counts")
+        _, min_idx = findmin(abs.(x[output.>0] - xmin))
+        xaxis = x[output.>0][min_idx:end]
+        lin_output = exp10.(a * log10.(xaxis) + log10.(b))
+        rounded_eta = round(eta, 1)
+        Plots.plot!(p0, xaxis, lin_output, xscale=:log10, yscale=:log10, label = "\$ \\hat\{ \\eta\}=$rounded_eta  \$", line=(3,:dash))
+        Plots.plot!(p0, title=fname, xlabel="Node degree", ylabel="Counts", guidefont = font(15))
         Plots.gui()
+        savefig("$plot_dir/nodes_degre_power_law_$fname.pdf");
 
         delta = ts[2:end] - ts[1:end-1]
         p_hat = length(delta)/sum(delta)
@@ -92,14 +98,17 @@ for fname in readdir(dir)
         efs = [ef(k) for k=1:max(delta...)]
         max_k = find(efs .< 0.98)[end]
 
-        p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "True data", line=(3))
-        Plots.plot!(p1, 1:max_k, [1 - (1-p_hat)^k for k=1:max_k], label = "MLE", line=(3,:dash))
-        Plots.plot!(p1, title=fname, xlabel="Inter-arrival time", ylabel="Cumulative distribution function")
+        p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "Data", line=(3))
+        p_hat_rounded = round(p_hat, 1)
+        Plots.plot!(p1, 1:max_k, [1 - (1-p_hat)^k for k=1:max_k], label = "\$ \\hat\{ \\beta \}=$p_hat_rounded\$", line=(3,:dash))
+        Plots.plot!(p1, title=fname, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15))
         Plots.gui()
+        savefig("$plot_dir/inter_arrival_times_$fname.pdf");
 
         p2 = Plots.plot(1:length(ts), ts, label="Arrivals", line=(3))
-        Plots.plot!(p2, title=fname, xlabel="Observations", ylabel="Arrival Time")
+        Plots.plot!(p2, title=fname, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15))
         Plots.gui()
+        savefig("$plot_dir/arrival_times_$fname.pdf");
 
         println("p_hat ", p_hat)
         println("KS D ", ks_stat)
