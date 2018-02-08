@@ -1,4 +1,5 @@
 ## evaluation metrics
+include("ntl_gibbs.jl")
 
 function mean_arrival_time_Lp(T_inferred::Vector{Int},T_truth::Vector{Int},p::Real)
   """
@@ -51,6 +52,27 @@ function total_variation_distance(p::Vector{Float64},q::Vector{Float64})
   return d
 end
 
+function total_variation_distance(p::Vector{Int64},q::Vector{Int64})
+  """
+  Returns total variation distance between two discrete probabiliy distributions
+    `p` and `q`. Elements of `p` and `q` are assumed to corresponding support points.
+    If `size(p,1) != size(q,1)` then the shorter of the two is padded with zeros.
+  """
+  # if abs(1.0 - sum(p)) > eps() || abs(1.0 - sum(q)) > eps()
+  #   error("Elements of `p` or `q` do not sum to 1.")
+  # end
+  np = size(p,1)
+  nq = size(q,1)
+  if np==nq
+    d = 0.5*sum( abs.(p .- q) )
+  elseif np > nq
+    d = total_variation_distance(p,[q; zeros(Int64,np-nq)])
+  else
+    d = total_variation_distance([p; zeros(Int64,nq-np)],q)
+  end
+  return d
+end
+
 function deviance_information_criterion(PP::Vector{Int},T_gibbs::Array{Float64,2},alpha_gibbs::Vector{Float64})
   """
   Returns DIC based on arrival times and α (marginalizes Ψ_j's)
@@ -91,8 +113,8 @@ function predictive_logprob(PP_train::Vector{Int},T_train::Vector{Int},
     of `PP_train_test` correspond to those same elements and `PP_train_test[k] >= PP_train[k]` should
     be true for all `k <= K_train`. Similarly, `T_train_test` shoud be an extension of `T_train`.
   """
-  logp_train = logp_partition(PP_train,T_train,alpha,predictive_ia_dist,true)
-  logp_test_train = logp_partition(PP_train_test,T_train_test,alpha,predictive_ia_dist,true)
+  logp_train = logp_partition(PP_train,T_train,alpha,predictive_ia_dist,false)
+  logp_test_train = logp_partition(PP_train_test,T_train_test,alpha,predictive_ia_dist,false)
   return logp_test_train - logp_train
 end
 
@@ -128,25 +150,25 @@ function sample_predicted_arrival_times(ia_dist::Function,T_end::Int,
     which corresponds to the `K_end`-th arrival time, until `n_end + n_preds` is exceeded.
     The first sampled arrival time is forced to be greater than `n_end`.
   """
-
-  zero_shift = Int(minimum(interarrival_dist(1,1)) == 0)
+  zero_shift = 1 - minimum(ia_dist(1,1))
+  K_start = K_end
   # sample first arrival
   new_arr = T_end + rand(ia_dist(T_end,K_start)) + zero_shift
   while new_arr < n_end
     new_arr = T_end + rand(ia_dist(T_end,K_start)) + zero_shift
   end
 
-  if new_arr > n_end
+  if new_arr > (n_end + n_preds)
     return []
   else
-    T[1] = new_arr
+    T = [new_arr]
     j = 1
     K = K_start + j
-    while T[end] < n_end + n_preds
+    while T[end] < (n_end + n_preds)
       j += 1
-      append!(T,rand(interarrival_dist(T[j-1],K_start+j-1)) + T[j-1] + zero_shift)
+      append!(T,rand(ia_dist(T[j-1],K_start+j-1)) + T[j-1] + zero_shift)
     end
-    if T[end] > N
+    if T[end] > (n_end + n_preds)
       pop!(T)
     end
     return T
@@ -185,7 +207,7 @@ function sample_predicted_sequence(PP_train::Vector{Int},T_end::Int,
 
     k = K_train
     for n in 1:n_preds
-      if n <= T_pred[end] && n == T[k+1]
+      if n+n_train <= T_pred[end] && n+n_train == T_pred[k+1-K_train]
         k += 1
         PP[k] = 1
         Z[n] = k
