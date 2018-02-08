@@ -69,7 +69,6 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
     """
     - `PP`: vector of partition block sizes ordered by arrival time
     - `T`: vector of arrival times
-    - `Psi`: vector of beta random variables (can be log(Psi))
     - `alpha`: 'discount parameter' in size-biased reinforcement
     - `ia_dist`: function that creates an interarrival distribution at fixed parameters
     - `is_partition`: flag for computing binomial coefficients
@@ -82,14 +81,14 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
     # pop!(PP_bar)
     ia = T[2:end] .- T[1:(end-1)]
 
-    K = size(Psi,1)
+    K = length(PP)
     idx = 1:(K-1)
     N = sum(PP)
 
     log_p = log_CPPF(PP,T,alpha)
 
     N - T[end] > 0 ? log_p += log(1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift)) : nothing
-    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j])] for j in 2:K )
+    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1])] for j in 2:K )
     # include binomial coefficients if for a partition
     if is_partition
       log_p += sum([lbinom(PP_bar[j] - T[j],PP[j] - 1) for j in 2:K])
@@ -483,7 +482,7 @@ function log_cppf_arrivals(T::Vector{Int},alpha::Float64)
     helper function for `log_CPPF` and `update_label_sequence`
     """
     K = size(T,1)
-    ret = sum( lgamma.(T .- (2:K).*alpha) ) - sum( lgamma.(T[2:end] .- 1 .- (0:(K-1)).*alpha) )
+    ret = sum( lgamma.(T .- (1:K).*alpha) ) - sum( lgamma.(T[2:end] .- 1 .- (1:(K-1)).*alpha) )
     return ret
 end
 
@@ -495,7 +494,7 @@ function log_cppf_arrivals(T::Vector{Int},arrival_offset::Int,alpha::Float64)
     K-th arrival
   """
   K_end = arrival_offset - 1 + size(T,1)
-  ret sum( lgamma.(T .- (arrival_offset:K_end)*alpha) ) - sum( lgamma.(T .- 1 .- (arrival_offset-1):(K_end-1).*alpha) )
+  return sum( lgamma.(T .- (arrival_offset:K_end)*alpha) ) - sum( lgamma.(T .- 1 .- (arrival_offset-1):(K_end-1).*alpha) )
 end
 
 function log_CPPF(PP::Vector{Int},T::Vector{Int},alpha::Float64)
