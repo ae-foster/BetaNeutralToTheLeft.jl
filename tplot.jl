@@ -61,11 +61,11 @@ data_fitted_parameters = Dict(
 # dir = "/data/flyrobin/foster/Documents/NTL.jl/"
 plot_dir = "plots"
 data_dir = "data/"
-fname = "sorted-mathoverflow.txt"
-# for fname in readdir(data_dir)
+# fname = "sorted-stackoverflow.txt"
+for fname in readdir(data_dir)
     if startswith(fname, "sorted-")
         fname_parsed = split(split(fname, ".txt")[1],"sorted-")[end]
-        # if fname_parsed in ["CollegeMsg", "email", "stackoverflow"] continue end
+        # if fname_parsed in ["stackoverflow"] continue end
         degs, ts = parseSnapData("$data_dir$fname")
         println("\n$fname_parsed")
 
@@ -76,7 +76,7 @@ fname = "sorted-mathoverflow.txt"
         ef = ecdf(degs)
         x = logspace(log(min(degs...)), log(max(degs...)), 500)
         output = [(1-ef(t)) for t in x]
-        p0 = Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10, label = "Empirical", line=(3))
+        p0 = Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10, label = "Empirical", line=(3));
         xmin = Int(data_fitted_parameters[fname_parsed]["xmin"])
         eta = data_fitted_parameters[fname_parsed]["eta"]
         a = - eta + 1
@@ -87,8 +87,8 @@ fname = "sorted-mathoverflow.txt"
         # lin_output = exp10.(a * log10.(xaxis) + log10.(b))
         lin_output = exp10.(a * (log10.(xaxis) - log10(xaxis[1])) + log10(1-ef(xaxis[1])))
         rounded_eta = round(eta, 2)
-        Plots.plot!(p0, xaxis, lin_output, xscale=:log10, yscale=:log10, label = "\$ \\hat\{ \\eta\}=$rounded_eta \$", line=(3,:dash))
-        Plots.plot!(p0, title=fname_parsed, xlabel="Node degree", ylabel="Counts", guidefont = font(15), legendfont=font(12))
+        Plots.plot!(p0, xaxis, lin_output, xscale=:log10, yscale=:log10, label = "\$ \\hat\{ \\eta\}=$rounded_eta \$", line=(3,:dash));
+        Plots.plot!(p0, title=fname_parsed, xlabel="Node degree", ylabel="Counts", guidefont = font(15), legendfont=font(12));
         # Plots.gui()
         savefig("$plot_dir/nodes_degre_power_law_$fname_parsed.pdf")
 
@@ -103,10 +103,10 @@ fname = "sorted-mathoverflow.txt"
         efs = [ef(k) for k=1:max(delta...)]
         max_k = find(efs .< 0.98)[end]
 
-        p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "Empirical", line=(3))
+        p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "Empirical", line=(3));
         p_hat_rounded = round(p_hat, 2)
-        Plots.plot!(p1, 1:max_k, [1 - (1-p_hat)^k for k=1:max_k], label = "\$ \\hat\{ \\beta \}=$p_hat_rounded\$", line=(3,:dash))
-        Plots.plot!(p1, title=fname_parsed, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15), legendfont=font(12))
+        Plots.plot!(p1, 1:max_k, [1 - (1-p_hat)^k for k=1:max_k], label = "\$ \\hat\{ \\beta \}=$p_hat_rounded\$", line=(3,:dash));
+        Plots.plot!(p1, title=fname_parsed, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15), legendfont=font(12));
         # Plots.gui()
         savefig("$plot_dir/inter_arrival_times_$fname_parsed.pdf");
 
@@ -114,8 +114,8 @@ fname = "sorted-mathoverflow.txt"
         # Arrival times simple plot
         #######################################################################
 
-        p2 = Plots.plot(1:length(ts), ts, label="Arrivals", line=(3))
-        Plots.plot!(p2, title=fname_parsed, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15), legendfont=font(12))
+        p2 = Plots.plot(ts, 1:length(ts), label="Arrivals", line=(3));
+        Plots.plot!(p2, title=fname_parsed, xlabel="Number of observed clusters", ylabel="Observations", guidefont = font(15), legendfont=font(12));
         # Plots.gui()
         savefig("$plot_dir/arrival_times_$fname_parsed.pdf");
 
@@ -127,4 +127,4 @@ fname = "sorted-mathoverflow.txt"
         # xmin = 5
         # println("alpha hat ", 1 + n/(sum(log.(degs[degs.>xmin])) - n*log(xmin - 0.5)))
     end
-# end
+end
