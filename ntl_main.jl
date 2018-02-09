@@ -14,7 +14,7 @@ include("evaluation.jl")
 # Gibbs sampler settings
 ###########################################################################
 n_iter = 50000  # total number of Gibbs iterations to run
-n_burn = 1000   # burn-in
+n_burn = 5000   # burn-in
 n_thin = 100     # collect every `n_thin` samples
 
 # set which components to update
@@ -32,13 +32,13 @@ srand(0)
 ############################################################################
 # need to add support for certain real data sets
 
-base_dir = "/data/flyrobin/foster/Documents/NTL.jl/"
-dataset_name = "dnc"
+# base_dir = "/data/flyrobin/foster/Documents/NTL.jl/"
+dataset_name = "synthetic geometric"
 
 if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   println("Synethsizing data.")
   include("crp.jl")
-  N = 1000
+  N = 2000
   ntl_alpha = 0.5
   crp_theta = 10.0
   crp_alpha = 0.6

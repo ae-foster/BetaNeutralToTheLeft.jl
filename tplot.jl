@@ -61,35 +61,32 @@ data_fitted_parameters = Dict(
 # dir = "/data/flyrobin/foster/Documents/NTL.jl/"
 plot_dir = "plots"
 data_dir = "data/"
-for fname in readdir(data_dir)
+fname = "sorted-mathoverflow.txt"
+# for fname in readdir(data_dir)
     if startswith(fname, "sorted-")
+        fname_parsed = split(split(fname, ".txt")[1],"sorted-")[end]
+        # if fname_parsed in ["CollegeMsg", "email", "stackoverflow"] continue end
         degs, ts = parseSnapData("$data_dir$fname")
-        fname = split(split(fname, ".txt")[1],"-")[end]
-        println("\n$fname")
-
-        # Plots.plot(ts, title=fname)
-        # Plots.gui()
-        #
-        # Plots.histogram(ts[2:end] - ts[1:end-1], bins=100)
-        # Plots.gui()
+        println("\n$fname_parsed")
 
         ef = ecdf(degs)
-        x = logspace(log(min(degs...)), log(max(degs...)), 100)
+        x = logspace(log(min(degs...)), log(max(degs...)), 500)
         output = [(1-ef(t)) for t in x]
-        p0 = Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10, label = "Data", line=(3))
-        xmin = Int(data_fitted_parameters[fname]["xmin"])
-        eta = data_fitted_parameters[fname]["eta"]
+        p0 = Plots.plot(x[output.>0], output[output.>0], xscale=:log10, yscale=:log10, label = "Empirical", line=(3))
+        xmin = Int(data_fitted_parameters[fname_parsed]["xmin"])
+        eta = data_fitted_parameters[fname_parsed]["eta"]
         a = - eta + 1
         b = 1-ef(log10(xmin)) - a * log10(xmin)
-
         _, min_idx = findmin(abs.(x[output.>0] - xmin))
         xaxis = x[output.>0][min_idx:end]
-        lin_output = exp10.(a * log10.(xaxis) + log10.(b))
-        rounded_eta = round(eta, 1)
-        Plots.plot!(p0, xaxis, lin_output, xscale=:log10, yscale=:log10, label = "\$ \\hat\{ \\eta\}=$rounded_eta  \$", line=(3,:dash))
-        Plots.plot!(p0, title=fname, xlabel="Node degree", ylabel="Counts", guidefont = font(15))
-        Plots.gui()
-        savefig("$plot_dir/nodes_degre_power_law_$fname.pdf");
+
+        # lin_output = exp10.(a * log10.(xaxis) + log10.(b))
+        lin_output = exp10.(a * (log10.(xaxis) - log10(xaxis[1])) + log10(1-ef(xaxis[1])))
+        rounded_eta = round(eta, 2)
+        Plots.plot!(p0, xaxis, lin_output, xscale=:log10, yscale=:log10, label = "\$ \\hat\{ \\eta\}=$rounded_eta \$", line=(3,:dash))
+        Plots.plot!(p0, title=fname_parsed, xlabel="Node degree", ylabel="Counts", guidefont = font(15))
+        # Plots.gui()
+        savefig("$plot_dir/nodes_degre_power_law_$fname_parsed.pdf")
 
         delta = ts[2:end] - ts[1:end-1]
         p_hat = length(delta)/sum(delta)
@@ -98,17 +95,17 @@ for fname in readdir(data_dir)
         efs = [ef(k) for k=1:max(delta...)]
         max_k = find(efs .< 0.98)[end]
 
-        p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "Data", line=(3))
-        p_hat_rounded = round(p_hat, 1)
+        p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "Empirical", line=(3))
+        p_hat_rounded = round(p_hat, 2)
         Plots.plot!(p1, 1:max_k, [1 - (1-p_hat)^k for k=1:max_k], label = "\$ \\hat\{ \\beta \}=$p_hat_rounded\$", line=(3,:dash))
-        Plots.plot!(p1, title=fname, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15))
-        Plots.gui()
-        savefig("$plot_dir/inter_arrival_times_$fname.pdf");
+        Plots.plot!(p1, title=fname_parsed, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15))
+        # Plots.gui()
+        savefig("$plot_dir/inter_arrival_times_$fname_parsed.pdf");
 
         p2 = Plots.plot(1:length(ts), ts, label="Arrivals", line=(3))
-        Plots.plot!(p2, title=fname, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15))
-        Plots.gui()
-        savefig("$plot_dir/arrival_times_$fname.pdf");
+        Plots.plot!(p2, title=fname_parsed, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15))
+        # Plots.gui()
+        savefig("$plot_dir/arrival_times_$fname_parsed.pdf");
 
         println("p_hat ", p_hat)
         println("KS D ", ks_stat)
@@ -118,4 +115,4 @@ for fname in readdir(data_dir)
         # xmin = 5
         # println("alpha hat ", 1 + n/(sum(log.(degs[degs.>xmin])) - n*log(xmin - 0.5)))
     end
-end
+# end
