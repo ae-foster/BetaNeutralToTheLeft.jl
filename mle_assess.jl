@@ -6,8 +6,8 @@ include("likelihoods.jl")
 include("evaluation.jl")
 include("crp.jl")
 include("ntl_gibbs.jl")
-# gr()
-plotly()
+gr()
+# plotly()
 
 ## Assume serialized MLEs to be found in json file
 percent = ARGS[1]
@@ -20,11 +20,10 @@ println("Read successful")
 plot_dir = "plots"
 data_dir = "data/"
 
-# for fname in readdir(data_dir)
-fname = "sorted-mathoverflow.txt"
+for fname in readdir(data_dir)
     if startswith(fname, "sorted-")
         fname_parsed = split(split(fname, ".txt")[1],"sorted-")[end]
-        # if fname_parsed in ["CollegeMsg", "email", "stackoverflow"] continue end
+        if fname_parsed in ["CollegeMsg", "email", "stackoverflow"] continue end
         println(fname)
 
         #######################################################################
@@ -39,26 +38,37 @@ fname = "sorted-mathoverflow.txt"
         # Many predictions for Tj
         T_new = results[fname]["true arrivals"]
 
-        # nb_clusters_pyp_mean = [mean([sum(u .< t) for u in results[fname]["PYP"]["predicted arrivals"]]) for t in 1:length(T_new)]
-        # nb_clusters_pyp = [[sum(u .< t) for u in results[fname]["PYP"]["predicted arrivals"]] for t in 1:length(T_new)]
-        # nb_clusters_pyp_mean = [mean(x) for x in nb_clusters_pyp]
-        # nb_clusters_pyp_std = [std(x) for x in nb_clusters_pyp]
+        #######################################################################
+        # Predicted Ts (Emile's plots)
+        #######################################################################
 
-        # n_test = results[fname]["n_test"] # right key even if it's seems wrong
-        n_test = sum(results[fname]["true PP"]) - results[fname]["n_test"] # right key even if it's seems wrong
-        nb_clusters_ntl = [[sum(u .< t) for u in results[fname]["NTL"]["predicted arrivals"]] for t in 1:n_test]
-        nb_clusters_ntl_mean = [mean(x) for x in nb_clusters_ntl]
-        # nb_clusters_ntl_std = [std(x) for x in nb_clusters_ntl]
-
-        nb_clusters_true = [sum(T_new .< t) for t in 1:n_test]
-        println(size(nb_clusters_ntl_mean))
-        # println(size(nb_clusters_pyp_mean))
-        println(size(nb_clusters_true))
-
-        # plot(nb_clusters_pyp_mean, label="PYP")
-        plot(nb_clusters_ntl, label="NTL")
-        plot!(nb_clusters_true, color="black",lw=2, title="NTL_$fname_parsed")
-        gui()
+        # Resize predictions so that they have the same length
+        # nb_predictions = 0
+        #
+        # min_size_pyp = length(T_new)
+        # for u in results[fname]["PYP"]["predicted arrivals"]
+        #     min_size_pyp = min(min_size_pyp, Int(length(u)))
+        #     nb_predictions += 1
+        # end
+        #
+        # min_size_ntl = length(T_new)
+        # for u in results[fname]["NTL"]["predicted arrivals"]
+        #     min_size_ntl = min(min_size_ntl, Int(length(u)))
+        # end
+        #
+        # pyp_predict = zeros(Int64, nb_predictions, min_size_pyp)
+        # ntl_predict = zeros(Int64, nb_predictions, min_size_ntl)
+        # for (i, u) in enumerate(results[fname]["PYP"]["predicted arrivals"])
+        #     pyp_predict[i, :] = u[1:min_size_pyp]
+        # end
+        # for (i, u) in enumerate(results[fname]["NTL"]["predicted arrivals"])
+        #     ntl_predict[i, :] = u[1:min_size_ntl]
+        # end
+        #
+        # med_pyp = mean(pyp_predict, 1)'
+        # std_pyp = std(pyp_predict, 1)'
+        # med_ntl = mean(ntl_predict, 1)'
+        # std_ntl = std(ntl_predict, 1)'
 
         # plot(1:min_size_ntl, T_new[1:min_size_ntl], label="Empirical", line=(2,:solid))
         # plot!(1:min_size_ntl, med_ntl, label="Predictive mean", linecolor="red", line=(2,:dashdot))
@@ -76,9 +86,31 @@ fname = "sorted-mathoverflow.txt"
         # savefig("$plot_dir/predictive_arrival_times_PYP_$fname_parsed.pdf");
         # # gui()
 
+        #######################################################################
+        # Number of Clusters
+        #######################################################################
 
+        n_test = sum(results[fname]["true PP"]) - results[fname]["n_test"] # right key even if it's seems wrong
+        println("n_test computed")
+        nb_clusters_ntl = [[sum(u .< t) for u in results[fname]["NTL"]["predicted arrivals"]] for t in 1:n_test]
+        println("nb_clusters_ntl computed")
+        nb_clusters_ntl_mean = [mean(x) for x in nb_clusters_ntl]
+        nb_clusters_ntl_std = [std(x) for x in nb_clusters_ntl]
 
-        ### Adam's old code
+        nb_clusters_true = [sum(T_new .< t) for t in 1:n_test]
+        println("nb_clusters_true computed")
+
+        plot(nb_clusters_ntl_mean, label="Mean", linecolor="red", line=(2,:dashdot))
+        plot(nb_clusters_ntl_mean+2*nb_clusters_ntl_std, label="Mean+2*std", linecolor="red", line=(1,:dot))
+        plot(nb_clusters_ntl_mean-2*nb_clusters_ntl_std, label="Mean-2*std", linecolor="red", line=(1,:dot))
+        plot!(nb_clusters_true, label="Empirical", line=(2,:solid))
+        Plots.plot!(title="NTL_$fname_parsed", xlabel="Indices", ylabel="Number new clusters", guidefont = font(15), legendfont=font(12), legend = :topleft)
+        # gui()
+        savefig("$plot_dir/predictive_nb_clusters_NTL_$fname_parsed.pdf");
+
+        #######################################################################
+        # Adam's old code
+        #######################################################################
 
         # pyp_predict = [Vector{Int64}(u) for u in results[fname]["PYP"]["predicted arrivals"]]
         # ntl_predict = [Vector{Int64}(u) for u in results[fname]["NTL"]["predicted arrivals"]]
@@ -122,4 +154,4 @@ fname = "sorted-mathoverflow.txt"
 
         println("\n")
     end
-# end
+end
