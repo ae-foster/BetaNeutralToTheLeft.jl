@@ -123,7 +123,7 @@ for fname in readdir(dir)
         # println("NTL #new clusters ", length(ntl_predict) - length(PP))
         # println("pyp #new clusters ", length(pyp_predict) - length(PP))
         results[fname]["n_test"] = n_test
-        results[fname]["n_test"] = n_train
+        results[fname]["n_train"] = n_train
         results[fname]["true PP"] = PP_test
         results[fname]["true T"] = T_test
         results[fname]["NTL"]["PP"] = ntl_PP
