@@ -1,5 +1,5 @@
 # Helper function for sums excluding the ts's
-function ldenom(f::Function, ts::Vector{Int64}, Tend::Int64, K::Int64)
+function lloop(f::Function, ts::Vector{Int64}, Tend::Int64, K::Int64)
     ldenom = 0
     t = ts[2]
     k = 1
@@ -42,11 +42,11 @@ function ntl_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
         return -Inf
     end
     if alpha < -1e10
-        return -ldenom((i,k)->log(k), ts, Tend, K)
+        return -lloop((i,k)->log(k), ts, Tend, K)
     end
 
     lnum = -K*lgamma(1-alpha) + dcounts' * lgamma.(ds - alpha)
-    lden = ldenom(((i, k)->log(i-1-alpha*k)), ts, Tend, K)
+    lden = lloop(((i, k)->log(i-1-alpha*k)), ts, Tend, K)
 
     return lnum - lden
 end
@@ -65,41 +65,38 @@ function neg_grad_ntl_llikelihood!(storage::Vector{Float64},
     end
 
     glnum = K*digamma(1-alpha) - dcounts' * digamma.(ds - alpha)
-    gldenom = ldenom((i,k)->-k/(i-1-alpha*k), ts, Tend, K)
+    gldenom = lloop((i,k)->-k/(i-1-alpha*k), ts, Tend, K)
 
     # negative
     storage[1] = -trans_correct * (glnum - gldenom)
 end
 
-function geom_llikelihood(g::Vector{Float64}, deltas::Vector{Int64}, lag::Int64)
+function geom_llikelihood(g::Vector{Float64}, K::Int64, Tend::Int64)
     # for optim
     g = exp(g[1])/(1+exp(g[1]))
-    return length(deltas)*log(g) + (sum(deltas-1)+lag)*log(1-g)
+    return (K-1)*log(g) + (Tend-K+1)*log(1-g)
 end
 
-function ntl_pyp_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
+function pyp_arr_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
         dcounts::Vector{Int64}, ts::Vector{Int64}, K::Int64, Tend::Int64)
     # For optim
     tau = exp(params[1])/(1+exp(params[1]))
     theta = params[2]
-    alpha = 1 - exp(params[3])
     if theta <= -tau
         return -Inf
     end
-    lnum = lgamma(theta + 1) + sum( log.(theta .+ tau.*collect(1:(K-1))) ) + sum( lgamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
-    ldenom =  lgamma(theta + ts[end]) + sum( lgamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
-    return lnum - ldenom + ntl_llikelihood([alpha],ds,dcounts,ts,K,Tend)
+    lnum = lgamma(theta + 1) + sum( log.(theta .+ tau.*collect(1:(K-1))) ) + lloop( (i,k)->log(i-1-k*tau), ts, Tend, K )
+    ldenom =  lgamma(theta + Tend)
+    return lnum - ldenom
 end
 
-function neg_grad_ntl_pyp_llikelihood!(storage::Vector{Float64},
+function neg_grad_pyp_arr_llikelihood!(storage::Vector{Float64},
         params::Vector{Float64}, ds::Vector{Int64},
         dcounts::Vector{Int64}, ts::Vector{Int64}, K::Int64, Tend::Int64)
     # For optim
     tau = exp(params[1])/(1+exp(params[1]))
     theta = params[2]
-    alpha = 1 - exp(params[3])
     trans_correct_tau = exp(params[1])/(1+exp(params[1]))^2
-    trans_correct_alpha = -exp(params[3])
 
     if theta <= -tau
         storage[1] = storage[2] = Inf
@@ -107,15 +104,14 @@ function neg_grad_ntl_pyp_llikelihood!(storage::Vector{Float64},
     end
 
     # tau negative gradient
-    glnum_tau = sum( 1./(theta .+ tau.*collect(1:(K-1))) ) - sum( collect(1:(K-1)).*digamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
-    gldenom_tau = -sum( collect(1:(K-1)).*digamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
+    glnum_tau = sum( k/(theta + tau*k ) for k=1:(K-1) ) + lloop((i,k)->-k/(i-1-k*tau), ts, Tend, K)
+    gldenom_tau = 0
     storage[1] = -trans_correct_tau*(glnum_tau - gldenom_tau)
     # theta negative gradient
-    glnum_theta = digamma(theta + 1) + sum( 1./(theta .+ tau.*collect(1:(K-1))) ) + sum( digamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
-    gldenom_theta = digamma(theta + ts[end]) sum( digamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
+    glnum_theta = digamma(theta + 1) + sum( 1./(theta .+ tau.*collect(1:(K-1))) )
+    gldenom_theta = digamma(theta + Tend)
     storage[2] = -(glnum_theta - gldenom_theta)
-    # alpha negative gradient
-    storage[3] = neg_grad_ntl_llikelihood!([storage[3]],[params[3]],ds,dcounts,ts,K,Tend)
+
 
 end
 
