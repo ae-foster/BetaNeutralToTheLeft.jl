@@ -74,7 +74,7 @@ end
 function geom_llikelihood(g::Vector{Float64}, K::Int64, Tend::Int64)
     # for optim
     g = exp(g[1])/(1+exp(g[1]))
-    return (K-1)*log(g) + (Tend-K+1)*log(1-g)
+    return (K-1)*log(g) + (Tend-K)*log(1-g)
 end
 
 function pyp_arr_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
