@@ -69,6 +69,10 @@ fname = "sorted-mathoverflow.txt"
         degs, ts = parseSnapData("$data_dir$fname")
         println("\n$fname_parsed")
 
+        #######################################################################
+        # Inter-arrival times power law fit in log10 space
+        #######################################################################
+
         ef = ecdf(degs)
         x = logspace(log(min(degs...)), log(max(degs...)), 500)
         output = [(1-ef(t)) for t in x]
@@ -88,6 +92,10 @@ fname = "sorted-mathoverflow.txt"
         # Plots.gui()
         savefig("$plot_dir/nodes_degre_power_law_$fname_parsed.pdf")
 
+        #######################################################################
+        # Inter-arrival times geometric cdf fit
+        #######################################################################
+
         delta = ts[2:end] - ts[1:end-1]
         p_hat = length(delta)/sum(delta)
         ef = ecdf(delta)
@@ -101,6 +109,10 @@ fname = "sorted-mathoverflow.txt"
         Plots.plot!(p1, title=fname_parsed, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15))
         # Plots.gui()
         savefig("$plot_dir/inter_arrival_times_$fname_parsed.pdf");
+
+        #######################################################################
+        # Arrival times simple plot
+        #######################################################################
 
         p2 = Plots.plot(1:length(ts), ts, label="Arrivals", line=(3))
         Plots.plot!(p2, title=fname_parsed, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15))
