@@ -1,0 +1,1 @@
+{"dataset_name":"synthetic geometric","arrivals":"crp","n_iter":50000,"n_burn":5000,"n_thin":100,"gibbs_psi":true,"gibbs_alpha":true,"gibbs_arrival_times":true,"gibbs_ia_params":true,"gibbs_perm_order":true,"N":2000,"ntl_alpha":0.25,"geom_p":0.5}
