@@ -1,3 +1,4 @@
 *.json
 !mle_results*.json
+!mle_predict*.json
 .tags*
