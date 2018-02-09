@@ -88,7 +88,7 @@ fname = "sorted-mathoverflow.txt"
         lin_output = exp10.(a * (log10.(xaxis) - log10(xaxis[1])) + log10(1-ef(xaxis[1])))
         rounded_eta = round(eta, 2)
         Plots.plot!(p0, xaxis, lin_output, xscale=:log10, yscale=:log10, label = "\$ \\hat\{ \\eta\}=$rounded_eta \$", line=(3,:dash))
-        Plots.plot!(p0, title=fname_parsed, xlabel="Node degree", ylabel="Counts", guidefont = font(15))
+        Plots.plot!(p0, title=fname_parsed, xlabel="Node degree", ylabel="Counts", guidefont = font(15), legendfont=font(12))
         # Plots.gui()
         savefig("$plot_dir/nodes_degre_power_law_$fname_parsed.pdf")
 
@@ -106,7 +106,7 @@ fname = "sorted-mathoverflow.txt"
         p1 = Plots.plot(1:max_k, [ef(k) for k=1:max_k], label = "Empirical", line=(3))
         p_hat_rounded = round(p_hat, 2)
         Plots.plot!(p1, 1:max_k, [1 - (1-p_hat)^k for k=1:max_k], label = "\$ \\hat\{ \\beta \}=$p_hat_rounded\$", line=(3,:dash))
-        Plots.plot!(p1, title=fname_parsed, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15))
+        Plots.plot!(p1, title=fname_parsed, xlabel="Inter-arrival time", ylabel="Cumulative distribution function", guidefont = font(15), legendfont=font(12))
         # Plots.gui()
         savefig("$plot_dir/inter_arrival_times_$fname_parsed.pdf");
 
@@ -115,7 +115,7 @@ fname = "sorted-mathoverflow.txt"
         #######################################################################
 
         p2 = Plots.plot(1:length(ts), ts, label="Arrivals", line=(3))
-        Plots.plot!(p2, title=fname_parsed, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15))
+        Plots.plot!(p2, title=fname_parsed, xlabel="Observations", ylabel="Arrival Time", guidefont = font(15), legendfont=font(12))
         # Plots.gui()
         savefig("$plot_dir/arrival_times_$fname_parsed.pdf");
 
