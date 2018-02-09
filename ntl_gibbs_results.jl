@@ -9,9 +9,9 @@ gr()
 dirname = "sampler_output/"
 
 for fname_full in readdir(dirname)
-    if endswith(fname_full, ".json")
+    if endswith(fname_full, ".jld")
 
-fname = split(fname_full, "params")[1]
+fname = split(fname_full, "samples")[1]
 println("Computing infered parameters for $fname")
 samples = load(dirname * fname * "samples.jld")
 
