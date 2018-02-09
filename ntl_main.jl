@@ -1,7 +1,7 @@
 # Gibbs samplers for Beta NTL models of partitions, graphs, mixtures
 using Distributions
 using StatsBase
-using Memoize
+# using Memoize
 
 include("dataset.jl")
 include("crp.jl")
@@ -13,7 +13,7 @@ include("evaluation.jl")
 ###########################################################################
 # Gibbs sampler settings
 ###########################################################################
-n_iter = 50000  # total number of Gibbs iterations to run
+n_iter = 50000 # 50000  # total number of Gibbs iterations to run
 n_burn = 5000   # burn-in
 n_thin = 100     # collect every `n_thin` samples
 
@@ -39,9 +39,9 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
   println("Synethsizing data.")
   include("crp.jl")
   N = 2000
-  ntl_alpha = 0.5
-  crp_theta = 10.0
-  crp_alpha = 0.6
+  ntl_alpha = 0.5 # [-10., .25, .75]
+  crp_theta = 1.0
+  crp_alpha = 0.6 # [.25, .75]
   # create intearrival distribution object and synthetic data
   interarrival_dist = CRP(crp_theta,crp_alpha)
   Z_data, PP_data, T_data = generateLabelSequence(N,ntl_alpha,interarrival_dist)
@@ -54,9 +54,9 @@ if dataset_name=="synthetic crp" # Synthetic data w/ CRP interarrivals
 
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
   println("Synethsizing data.")
-  N = 1000
-  ntl_alpha = 0.5
-  geom_p = 0.25
+  N = 2000
+  ntl_alpha = 0.5 # [-10., .25, .75]
+  geom_p = 0.5
   # create intearrival distribution object and synthetic data
   interarrival_dist = Geometric
   Z_data, PP_data, T_data = generateLabelSequence(N,ntl_alpha,interarrival_dist(geom_p))
@@ -258,8 +258,14 @@ println("Finished running Gibbs sampler.")
 ############################################################################
 
 using JLD
-fname = "./sampler_output/gibbs_" * dataset_name * "_" * arrivals * ".jld"
-save(fname,
+using JSON
+using DataStructures
+
+datetime = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
+dirname = "./sampler_output/gibbs_" * datetime * "_"
+fname = "samples.jld"
+pathname = dirname * fname
+save(pathname,
     "psi_gibbs",psi_gibbs,
     "T_gibbs",T_gibbs,
     "alpha_gibbs",alpha_gibbs,
@@ -267,6 +273,26 @@ save(fname,
     "perm_gibbs",perm_gibbs,
     "N",N,"K",K,"t_elapsed",t_elapsed,
     "PP",PP,"perm_data",perm_data,"T_data",T_data,"Z_data",Z_data)
+
+params = OrderedDict(
+"dataset_name" => dataset_name, "arrivals" => arrivals,
+"n_iter" => n_iter, "n_burn" => n_burn, "n_thin" => n_thin,
+"gibbs_psi" => gibbs_psi, "gibbs_alpha" => gibbs_alpha, "gibbs_arrival_times" => gibbs_arrival_times, "gibbs_ia_params" => gibbs_ia_params, "gibbs_perm_order" => gibbs_perm_order
+)
+if dataset_name == "synthetic crp"
+    params["N"] = N
+    params["ntl_alpha"] = ntl_alpha
+    params["crp_theta"] = crp_theta
+    params["crp_alpha"] = crp_alpha
+elseif dataset_name == "synthetic geometric"
+    params["N"] = N
+    params["ntl_alpha"] = ntl_alpha
+    params["geom_p"] = geom_p
+end
+
+open(dirname * "params.json", "w") do f
+    write(f, JSON.json(params))
+end
 
 ############################################################################
 # some performance evaluation metrics
