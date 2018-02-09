@@ -82,13 +82,41 @@ function ntl_pyp_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
     # For optim
     tau = exp(params[1])/(1+exp(params[1]))
     theta = params[2]
-    alpha = params[3]
+    alpha = 1 - exp(params[3])
     if theta <= -tau
         return -Inf
     end
     lnum = lgamma(theta + 1) + sum( log.(theta .+ tau.*collect(1:(K-1))) ) + sum( lgamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
     ldenom =  lgamma(theta + ts[end]) + sum( lgamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
     return lnum - ldenom + ntl_llikelihood([alpha],ds,dcounts,ts,K,Tend)
+end
+
+function neg_grad_ntl_pyp_llikelihood!(storage::Vector{Float64},
+        params::Vector{Float64}, ds::Vector{Int64},
+        dcounts::Vector{Int64}, ts::Vector{Int64}, K::Int64, Tend::Int64)
+    # For optim
+    tau = exp(params[1])/(1+exp(params[1]))
+    theta = params[2]
+    alpha = 1 - exp(params[3])
+    trans_correct_tau = exp(params[1])/(1+exp(params[1]))^2
+    trans_correct_alpha = -exp(params[3])
+
+    if theta <= -tau
+        storage[1] = storage[2] = Inf
+        return
+    end
+
+    # tau negative gradient
+    glnum_tau = sum( 1./(theta .+ tau.*collect(1:(K-1))) ) - sum( collect(1:(K-1)).*digamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
+    gldenom_tau = -sum( collect(1:(K-1)).*digamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
+    storage[1] = -trans_correct_tau*(glnum_tau - gldenom_tau)
+    # theta negative gradient
+    glnum_theta = digamma(theta + 1) + sum( 1./(theta .+ tau.*collect(1:(K-1))) ) + sum( digamma.(ts[2:end] .- 1 .- tau.*collect(1:(K-1))) )
+    gldenom_theta = digamma(theta + ts[end]) sum( digamma.(ts[1:(end-1)] .- tau.*collect(1:(K-1))) )
+    storage[2] = -(glnum_theta - gldenom_theta)
+    # alpha negative gradient
+    storage[3] = neg_grad_ntl_llikelihood!([storage[3]],[params[3]],ds,dcounts,ts,K,Tend)
+
 end
 
 function pyp_llikelihood(params::Vector{Float64}, ds::Vector{Int64},
