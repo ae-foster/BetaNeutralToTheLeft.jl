@@ -254,6 +254,21 @@ println("Finished running Gibbs sampler.")
 ############################################################################
 
 ############################################################################
+# save sample output
+############################################################################
+
+using JLD
+fname = "./sampler_output/gibbs_" * dataset_name * "_" * arrivals * ".jld"
+save(fname,
+    "psi_gibbs",psi_gibbs,
+    "T_gibbs",T_gibbs,
+    "alpha_gibbs",alpha_gibbs,
+    "ia_params_gibbs",ia_params_gibbs,
+    "perm_gibbs",perm_gibbs,
+    "N",N,"K",K,"t_elapsed",t_elapsed,
+    "PP",PP,"perm_data",perm_data,"T_data",T_data,"Z_data",Z_data)
+
+############################################################################
 # some performance evaluation metrics
 ############################################################################
 
