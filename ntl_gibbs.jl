@@ -88,7 +88,7 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
     log_p = log_CPPF(PP,T,alpha)
 
     N - T[end] > 0 ? log_p += log(1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift)) : nothing
-    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1])] for j in 2:K )
+    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]) for j in 2:K ])
     # include binomial coefficients if for a partition
     if is_partition
       log_p += sum([lbinom(PP_bar[j] - T[j],PP[j] - 1) for j in 2:K])
@@ -101,7 +101,7 @@ end
 # memoize this?
 function lbinom(n::Int,k::Int)
     """
-    compues log of binomial coefficient {`n` choose `k`}
+    computes log of binomial coefficient {`n` choose `k`}
     """
     ret = lgamma(n+1) - lgamma(k+1) - lgamma(n - k + 1)
     return ret
@@ -699,30 +699,36 @@ function sample_interarrival(j::Int,T_jm1::Int,T_jp1::Int,ia_dist::Function,
   typeof(ia_dist(1,1))==Distributions.Geometric{Float64} ? geom = true : geom = false
   typeof(ia_dist(1,1))==CRPinterarrival ? crp = true : crp = false
   crp ? crp_dist = ia_dist(1,1) : nothing
+  ia_dist(1,1)==ia_dist(10,10) ? iid = true : iid = false
 
   # determine support
   supp = 1:min(delta2 - 1, PP_bar_jm1 - T_jm1 + 1)
-  # calculate pmf of conditional distribution
-  log_p = zeros(Float64,size(supp,1))
-  if crp
-    log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1,j-1,supp.-zero_shift)
-  elseif !geom # geometric interarrival prior is memoryless => doesn't contribute
-    log_p += logpdf(ia_dist(T_jm1,j-1),supp.-zero_shift)
-  end
-  log_p += lbinom.(PP_bar_jm1 .+ PP_j .- T_jm1 .- supp, PP_j - 1)
-  log_p += lgamma.(T_jm1 .+ supp .- j*alpha) .- lgamma.(T_jm1 .+ supp .- 1 .- (j-1)*alpha)
-  if !geom
-    for s in supp
-      if crp
-        log_p[s] += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1+s,j,delta2 - (s-zero_shift))
-      else
-        log_p[s] += logpdf(ia_dist(T_jm1+s,j),delta2 - (s-zero_shift))
+  if size(supp,1) > 1
+    # calculate pmf of conditional distribution
+    log_p = zeros(Float64,size(supp,1))
+    if crp
+      log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1,j-1,supp.-zero_shift)
+    elseif !geom && iid # geometric interarrival prior is memoryless => doesn't contribute
+      log_p += logpdf(ia_dist(T_jm1,j-1),supp.-zero_shift)
+      log_p += log_p[end:-1:1] # iid interarrivals are symmetric
+    end
+    log_p += lbinom.(PP_bar_jm1 .+ PP_j .- T_jm1 .- supp, PP_j - 1)
+    log_p += lgamma.(T_jm1 .+ supp .- j*alpha) .- lgamma.(T_jm1 .+ supp .- 1 .- (j-1)*alpha)
+    if !iid
+      for s in supp
+        if crp
+          log_p[s] += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1+s,j,delta2 - s - zero_shift)
+        else
+          log_p[s] += logpdf(ia_dist(T_jm1+s,j),delta2 - s - zero_shift)
+        end
       end
     end
+    # sample an update
+    p = log_sum_exp_weights(log_p)
+    return wsample(supp,p)
+  else
+    return 1
   end
-  # sample an update
-  p = log_sum_exp_weights(log_p)
-  return wsample(supp,p)
 end
 
 function sample_final_arrival(T_Km1::Int,K::Int,n::Int,ia_dist::Function,
@@ -735,7 +741,7 @@ function sample_final_arrival(T_Km1::Int,K::Int,n::Int,ia_dist::Function,
     typeof(ia_dist(1,1))==CRPinterarrival ? crp = true : crp = false
     crp ? crp_dist = ia_dist(1,1) : nothing
 
-    supp = 1:min(n - T_Km1 - 1, PP_bar_Km1 - T_Km1 + 1)
+    supp = 1:min(n - T_Km1, PP_bar_Km1 - T_Km1 + 1)
     log_p = zeros(Float64,size(supp,1))
 
     if crp
@@ -746,16 +752,15 @@ function sample_final_arrival(T_Km1::Int,K::Int,n::Int,ia_dist::Function,
 
     log_p += lbinom.(n .- T_Km1 .- supp, PP_K - 1)
     log_p += lgamma.(T_Km1 .+ supp .- K*alpha) .- lgamma.(T_Km1 .+ supp .- 1 .- (K-1)*alpha)
+    # tmp = zeros(Float64,size(supp,1))
     if !geom
       for s in supp
         if crp
-          log_p[s] += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_Km1,K-1, s-zero_shift)
           p_gt = 1. - crp_cdf(crp_dist.theta,crp_dist.alpha,T_Km1+s,K,n-(T_Km1+s-zero_shift))
         else
-          log_p[s] += logpdf(ia_dist(T_Km1,K-1), s-zero_shift) #+ logpdf(ia_dist(T[K-1],K-1), s-zero_shift)
           p_gt = 1. - cdf(ia_dist(T_Km1+s,K),n-(T_Km1+s-zero_shift)) # this can be arbitrarily close to zero, need to handle numerical instability
         end
-        abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? nothing : log_p[s] += log(p_gt)
+        abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? log_p[s] = -Inf : log_p[s] += log(p_gt)
       end
     end
     p = log_sum_exp_weights(log_p)
