@@ -18,14 +18,14 @@ include("ess_experiments_util.jl")
 ###########################################################################
 # Experiment settings
 ###########################################################################
-
+save_output = true
 N = 1000 # size of sequence for synthetic data
 
-n_iter = 2000 # 50000  # total number of Gibbs iterations to run
-n_burn = 1000   # burn-in
-n_thin = 100     # collect every `n_thin` samples
+n_iter = 125000 # 50000  # total number of Gibbs iterations to run
+n_burn = 25000   # burn-in
+n_thin = 1000     # collect every `n_thin` samples
 
-n_rep = 2 # number of sampling experiment repetitions
+n_rep = 10 # number of sampling experiment repetitions
 
 n_print = 1000 # prints updates every `n_print` iterations
 
@@ -153,5 +153,39 @@ for ds in 1:size(datasets,1)
   end
 
   println("\n Finished with ",ds," out of ",n_ds," datasets. \n")
+
+end
+
+
+if save_output
+  using JLD
+  using JSON
+  using DataStructures
+
+  datetime = Dates.format(now(), "yyyy-mm-dd_HH-MM-SS")
+  dirname = "./ess_output/gibbs_" * datetime * "_"
+  fname = "ess_results.jld"
+  pathname = dirname * fname
+
+  save(pathname,
+      "runtimes",runtimes,
+      "ESS_alpha",ESS_alpha,
+      "ESS_logp",ESS_logp,
+      "ESS_sigma_logd",ESS_sigma_logd,
+      "sigma_mean_d",sigma_mean_d,
+      "ESS_T_logd",ESS_T_logd,
+      "T_mean_d",T_mean_d,
+      "alpha_mean_d",alpha_mean_d)
+
+  params = OrderedDict(
+  "datasets" => datasets, "arrival_dists" => arrival_dists, "ntl_alpha" => ntl_alpha, "N" => N, "ia_params" => ia_params,
+  "n_iter" => n_iter, "n_burn" => n_burn, "n_thin" => n_thin, "n_rep" => n_rep,
+  "gibbs_psi" => gibbs_psi, "gibbs_alpha" => gibbs_alpha, "gibbs_arrival_times" => gibbs_arrival_times, "gibbs_ia_params" => gibbs_ia_params, "gibbs_perm_order" => gibbs_perm_order,
+  "ntl_gamma_a" => ntl_gamma_a, "ntl_gamma_b" => ntl_gamma_b, "w_alpha" => w_alpha
+  )
+
+  open(dirname * "params.json", "w") do f
+      write(f, JSON.json(params))
+  end
 
 end

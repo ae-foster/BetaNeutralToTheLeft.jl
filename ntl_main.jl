@@ -351,12 +351,12 @@ if save_output
   fname = "samples.jld"
   pathname = dirname * fname
   save(pathname,
-      "psi_gibbs",psi_gibbs,
-      "T_gibbs",T_gibbs,
-      "alpha_gibbs",alpha_gibbs,
-      "ia_params_gibbs",ia_params_gibbs,
-      "perm_gibbs",perm_gibbs,
-      "N",N,"K",K,"t_elapsed",t_elapsed,
+      "psi_gibbs",spl_out.psi,
+      "T_gibbs",spl_out.T,
+      "alpha_gibbs",spl_out.alpha,
+      "ia_params_gibbs",spl_out.ia_params,
+      "perm_gibbs",spl_out.sigma,
+      "N",N,"K",K,"t_elapsed",spl_out.t_elapsed,
       "PP",PP,"perm_data",perm_data,"T_data",T_data,"Z_data",Z_data)
 
   params = OrderedDict(
