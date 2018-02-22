@@ -1,0 +1,1 @@
+{"dataset_name":"dnc","arrivals":"crp","n_iter":120000,"n_burn":50000,"n_thin":100,"gibbs_psi":true,"gibbs_alpha":true,"gibbs_arrival_times":true,"gibbs_ia_params":true,"gibbs_perm_order":true}
