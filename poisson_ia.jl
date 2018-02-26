@@ -24,7 +24,7 @@ function update_poisson_interarrival_param!(lambda::Vector{Float64},T_K::Int,K::
     # sample pseudo arrival K+1 (given p, doesn't affect distribution of other arrival times)
     # T_Kp1 = n + 1 + rand(Truncated(Poisson(lambda[1]),n - T_K, Inf)) # this throws `InexactError()`; not sure why
     supp = 0:ceil(100*lambda[1])
-    logp = logpdf(Poisson(lambda[1]),n - T_K .+ supp)
+    logp = logpdf.(Poisson(lambda[1]),n - T_K .+ supp)
     T_Kp1 = n + 1 + wsample(supp,log_sum_exp_weights(logp))
     # sample conjugate lambda
     lambda[1] = rand(Gamma(T_Kp1-K-1+params[1],params[2]/(params[2]*K + 1)))

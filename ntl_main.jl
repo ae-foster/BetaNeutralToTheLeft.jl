@@ -15,7 +15,7 @@ include("gibbs_util.jl")
 # Gibbs sampler settings
 ###########################################################################
 dataset_name = "synthetic geometric" # set dataset
-arrivals = "geometric" # set arrival time model
+arrivals = "poisson" # set arrival time model
 save_output = false # whether or not to save sampler output
 
 if startswith(dataset_name, "synthetic")
@@ -23,7 +23,7 @@ if startswith(dataset_name, "synthetic")
 end
 
 n_iter = 10000 # 50000  # total number of Gibbs iterations to run
-n_burn = 1000   # burn-in
+n_burn = 5000   # burn-in
 n_thin = 100     # collect every `n_thin` samples
 
 n_print = 1000 # prints updates every `n_print` iterations
@@ -71,8 +71,8 @@ if startswith(dataset_name,"synthetic crp") # Synthetic data w/ CRP interarrival
 elseif dataset_name=="synthetic geometric" # Synthetic data w/ geometric interarrivals
   println("Synethsizing data.")
   # N = 2000
-  ntl_alpha = 0.5 # [-10., .25, .75]
-  geom_p = 0.2
+  ntl_alpha = 0.8 # [-10., .25, .75]
+  geom_p = 0.5
   # create intearrival distribution object and synthetic data
   interarrival_dist = Geometric
   Z_data, PP_data, T_data = generateLabelSequence(N,ntl_alpha,interarrival_dist(geom_p))

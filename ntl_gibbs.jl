@@ -87,7 +87,11 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
 
     log_p = log_CPPF(PP,T,alpha)
 
-    N - T[end] > 0 ? log_p += log(1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift)) : nothing
+    if N - T[end] > 0
+      p_gt = 1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift)
+      abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? log_p = -Inf : log_p += log(p_gt)
+      # log_p += log(1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift))
+    end
     log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]) for j in 2:K ])
     # include binomial coefficients if for a partition
     if is_partition
@@ -152,10 +156,11 @@ function ntl_alpha_logpdf(alpha::Float64,PP::Vector{Int},T::Vector{Int},log_prio
     log_prior is a function that returns the (possibly unnormalized) prior log-probability
       of `alpha`
     """
-    PP_bar = cumsum(PP)
-    logp = log_prior(1 - alpha) # prior is specified as a distribution on (0,Inf); alpha ∈ (-Inf,1)
+    # PP_bar = cumsum(PP)
+    logp = log_prior(1 - alpha) + lgamma(PP[1] - alpha) - lgamma(sum(PP) - size(PP,1)*alpha) # prior is specified as a distribution on (0,Inf); alpha ∈ (-Inf,1)
     for j in 2:size(PP,1)
-      logp += lbeta(PP[j] - alpha, PP_bar[j-1] - (j-1)*alpha) - lbeta(1-alpha,T[j] - 1 - (j-1)*alpha)
+      logp +=  lgamma(PP[j] - alpha) - lbeta(1 - alpha,T[j] - 1 - (j-1)*alpha)
+      # logp += lbeta(PP[j] - alpha, PP_bar[j-1] - (j-1)*alpha) - lbeta(1-alpha,T[j] - 1 - (j-1)*alpha)
     end
     return logp
 end
@@ -709,8 +714,8 @@ function sample_interarrival(j::Int,T_jm1::Int,T_jp1::Int,ia_dist::Function,
     if crp
       log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha,T_jm1,j-1,supp.-zero_shift)
     elseif !geom && iid # geometric interarrival prior is memoryless => doesn't contribute
-      log_p += logpdf(ia_dist(T_jm1,j-1),supp.-zero_shift)
-      log_p += log_p[end:-1:1] # iid interarrivals are symmetric
+      tmp = logpdf.(ia_dist(T_jm1,j-1),supp.-zero_shift)
+      log_p += tmp .+ tmp[end:-1:1] # iid interarrivals are symmetric
     end
     log_p += lbinom.(PP_bar_jm1 .+ PP_j .- T_jm1 .- supp, PP_j - 1)
     log_p += lgamma.(T_jm1 .+ supp .- j*alpha) .- lgamma.(T_jm1 .+ supp .- 1 .- (j-1)*alpha)
@@ -747,7 +752,7 @@ function sample_final_arrival(T_Km1::Int,K::Int,n::Int,ia_dist::Function,
     if crp
       log_p += crp_logpdf(crp_dist.theta,crp_dist.alpha, T_Km1, K-1, supp.-zero_shift)
     elseif !geom
-      log_p += logpdf(ia_dist(T_Km1,K-1), supp.-zero_shift)
+      log_p += logpdf.(ia_dist(T_Km1,K-1), supp.-zero_shift)
     end
 
     log_p += lbinom.(n .- T_Km1 .- supp, PP_K - 1)
@@ -889,27 +894,27 @@ function update_block_order!(perm::Vector{Int},PP::Vector{Int},T::Vector{Int},al
     for j in 1:(K-1)
 
       j==1 ? ppbar_jm1 = 0 : ppbar_jm1 = PP_bar[j-1]
-      ppbar_jp1 = PP_bar[j+1]
-      ppbar_j = PP_bar[j]
-      pp_j = PP[j]
-      pp_jp1 = PP[j+1]
+      # ppbar_jp1 = PP_bar[j+1]
+      # ppbar_j = PP_bar[j]
+      # pp_j = PP[j]
+      # pp_jp1 = PP[j+1]
 
-      if pp_j==pp_jp1 # swap is a 50-50 flip
+      if PP[j]==PP[j+1] # swap is a 50-50 flip
         logp_swap = log(0.5)
         logp_noswap = log(0.5)
-      elseif ppbar_jm1 + pp_jp1 >= T[j+1] - 1
-        logp_swap = lgamma(ppbar_jm1 + pp_jp1 - T[j] + 1) - lgamma(ppbar_jp1 - pp_j - T[j+1] + 2)
-        logp_noswap = lgamma(ppbar_jm1 + pp_j - T[j] + 1) - lgamma(ppbar_j - T[j+1] + 2)
-      else
-        logp_swap = 0
-        logp_noswap = 1
+      elseif ppbar_jm1 + PP[j+1] >= T[j+1] - 1
+        logp_swap = lgamma(ppbar_jm1 + PP[j+1] - T[j] + 1) - lgamma(PP_bar[j+1] - PP[j] - T[j+1] + 2)
+        logp_noswap = lgamma(ppbar_jm1 + PP[j] - T[j] + 1) - lgamma(PP_bar[j] - T[j+1] + 2)
+      else # impossible to swap blocks given arrival times
+        logp_swap = -Inf
+        logp_noswap = 0.
       end
 
-      swap = wsample([true,false],[logp_swap,logp_noswap])
+      swap = wsample([true;false],log_sum_exp_weights([logp_swap;logp_noswap]))
       if swap
         swap_elements!(PP,j,j+1)
         swap_elements!(perm,j,j+1)
-        PP_bar[j] = (j == 1) ? PP[j] : PP_bar[j-1] + PP[j]
+        (j == 1) ? PP_bar[j] =  PP[j] : PP_bar[j] = PP_bar[j-1] + PP[j]
         PP_bar[j+1] = PP_bar[j] + PP[j+1]
       end
 

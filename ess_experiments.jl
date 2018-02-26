@@ -29,7 +29,7 @@ n_rep = 10 # number of sampling experiment repetitions
 
 n_print = 1000 # prints updates every `n_print` iterations
 
-ntl_alpha = 0.1 # "true" value of alpha that will be used to generate data
+ntl_alpha = 0.75 # "true" value of alpha that will be used to generate data
 
 # set which components to update
 gibbs_psi = true            # NTL Ψ paramters
@@ -38,10 +38,10 @@ gibbs_arrival_times = true  # arrival times
 gibbs_ia_params = true     # arrival time distribution parameters
 gibbs_perm_order = true   # order of blocks in partition/vertices in graph
 
-datasets = ["synthetic poisson","synthetic geometric"]
-ia_params = [[5.0], [0.1]] # these correspond to the datasets
-# arrival_dists = ["crp-coupled","crp-uncoupled","geometric","poisson"]
-arrival_dists = ["geometric","poisson"]
+datasets = ["synthetic crp-coupled","synthetic geometric"]
+ia_params = [[1.0], [0.25]] # these correspond to the datasets
+arrival_dists = ["crp-coupled","crp-uncoupled","geometric","poisson"]
+# arrival_dists = ["geometric","poisson"]
 
 n_ds = size(datasets,1)
 n_ad = size(arrival_dists,1)
@@ -76,10 +76,12 @@ ESS_alpha = zeros(Float64,n_ds,n_ad,n_rep)
 ESS_logp = zeros(Float64,n_ds,n_ad,n_rep)
 ESS_sigma_logd = zeros(Float64,n_ds,n_ad,n_rep)
 ESS_T_logd = zeros(Float64,n_ds,n_ad,n_rep)
+ESS_slack_logd = zeros(Float64,n_ds,n_ad,n_rep)
 
 sigma_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
 T_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
 alpha_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
+slack_mean_d = zeros(float64,n_ds,n_ad,n_rep)
 
 
 for ds in 1:size(datasets,1)
@@ -87,8 +89,9 @@ for ds in 1:size(datasets,1)
   srand(0)
   # generate synthetic data
   PP_data,T_data = genSynDegrees(datasets[ds],N,ntl_alpha,ia_params[ds])
-  PP_data_all = [PP_data_all; PP_data]
-  T_data_all = [T_data_all; T_data]
+  PP_data_all = [PP_data_all; [PP_data]]
+  T_data_all = [T_data_all; [T_data]]
+  slack_data = cumsum(PP_data)[1:(end-1)] .- T_data[2:end]
   # sort partition if necessary
   if gibbs_perm_order
     PP_sort = sortrows(hcat(PP_data,collect(1:size(PP_data,1))),rev=true)
@@ -137,7 +140,7 @@ for ds in 1:size(datasets,1)
       ESS_alpha[ds,ad,nr] = ess_factor_estimate(spl_out.alpha)[1]
       ESS_logp[ds,ad,nr] = ess_factor_estimate(spl_out.log_joint)[1]
 
-      sigma_d = mean( abs.(PP[spl_out.sigma] .- PP), 1 )
+      sigma_d = mean( abs.(PP[spl_out.sigma] .- PP_data), 1 )
       ESS_sigma_logd[ds,ad,nr] = ess_factor_estimate(log.(sigma_d))[1]
       sigma_mean_d[ds,ad,nr] = mean(sigma_d)
 
@@ -146,6 +149,10 @@ for ds in 1:size(datasets,1)
       T_mean_d[ds,ad,nr] = mean(T_d)
 
       alpha_mean_d[ds,ad,nr] = mean(abs.(spl_out.alpha .- ntl_alpha))
+
+      slack_d = mean(abs.(cumsum(PP[spl_out.sigma],1)[1:(end-1),:] .- spl_out.T[2:end,:] .- slack_data), 1)
+      ESS_slack_logd[ds,ad,nr] = ess_factor_estimate(log.(slack_d))[1]
+      slack_mean_d[ds,ad,nr] = mean(slack_d)
 
       println("\n > Finished with ",nr," out of ",n_rep," repetitions.")
     end
@@ -175,7 +182,13 @@ if save_output
       "sigma_mean_d",sigma_mean_d,
       "ESS_T_logd",ESS_T_logd,
       "T_mean_d",T_mean_d,
-      "alpha_mean_d",alpha_mean_d)
+      "alpha_mean_d",alpha_mean_d,
+      "ESS_slack_logd",ESS_slack_logd,
+      "slack_mean_d",slack_mean_d)
+
+  save(dirname * "syn_data.jld",
+      "PP_data_all",PP_data_all,
+      "T_data_all",T_data_all)
 
   params = OrderedDict(
   "datasets" => datasets, "arrival_dists" => arrival_dists, "ntl_alpha" => ntl_alpha, "N" => N, "ia_params" => ia_params,

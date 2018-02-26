@@ -32,9 +32,16 @@ scatter(PP,perm_ess,legend=false,color=log.(PP))
 med_T = median(spl_out.T,2)
 plot(spl_out.T,legend=false)
 plot!(T_data,lw=2,color="black",legend=false)
-# plot!(T_gibbs[:,end],lw=2,color="black",legend=false)
+# plot!(spl_out.T[:,end-200],color="black",legend=false)
 # plot!(spl_out.T[:,end],color="black")
 # plot!(spl_out.T[:,1],color="black")
+
+# plot(cumsum(PP[spl_out.sigma[:,end]]),legend=false)
+# plot!(spl_out.T[:,end])
+
+plot(cumsum(PP[spl_out.sigma],1)[1:(end-1),:] .- spl_out.T[2:end,:], legend=false)
+plot!(cumsum(PP_data)[1:(end-1)] .- T_data[2:end],color="black",lw=2)
+
 
 T_ess_factor = [ess_factor_estimate(log.(spl_out.T[i,:])) for i in 1:K  ]
 T_ess = [T_ess_factor[i][1] for i in 1:size(T_ess_factor,1)]
