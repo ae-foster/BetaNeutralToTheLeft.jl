@@ -70,6 +70,7 @@ K_data_all = zeros(Int64,n_ds)
 
 PP_data_all = []
 T_data_all = []
+spl_out_all = []
 
 runtimes = zeros(Float64,n_ds,n_ad,n_rep)
 ESS_alpha = zeros(Float64,n_ds,n_ad,n_rep)
@@ -81,7 +82,7 @@ ESS_slack_logd = zeros(Float64,n_ds,n_ad,n_rep)
 sigma_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
 T_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
 alpha_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
-slack_mean_d = zeros(float64,n_ds,n_ad,n_rep)
+slack_mean_d = zeros(Float64,n_ds,n_ad,n_rep)
 
 
 for ds in 1:size(datasets,1)
@@ -135,6 +136,7 @@ for ds in 1:size(datasets,1)
     println("Running sampler for ",ds," / ",n_ds," datasets; ",ad," / ",n_ad," arrival distributions.")
     for nr in 1:n_rep
       spl_out = GibbsSampler(sampler_control,PP,T_data)
+      spl_out_all = [spl_out_all; [spl_out]]
       # process output
       runtimes[ds,ad,nr] = spl_out.t_elapsed
       ESS_alpha[ds,ad,nr] = ess_factor_estimate(spl_out.alpha)[1]
@@ -184,7 +186,8 @@ if save_output
       "T_mean_d",T_mean_d,
       "alpha_mean_d",alpha_mean_d,
       "ESS_slack_logd",ESS_slack_logd,
-      "slack_mean_d",slack_mean_d)
+      "slack_mean_d",slack_mean_d,
+      "spl_out_all",spl_out_all)
 
   save(dirname * "syn_data.jld",
       "PP_data_all",PP_data_all,
