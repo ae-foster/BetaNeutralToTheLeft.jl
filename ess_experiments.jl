@@ -29,7 +29,7 @@ n_rep = 10 # number of sampling experiment repetitions
 
 n_print = 1000 # prints updates every `n_print` iterations
 
-ntl_alpha = 0.75 # "true" value of alpha that will be used to generate data
+ntl_alpha = -2.0 # "true" value of alpha that will be used to generate data
 
 # set which components to update
 gibbs_psi = true            # NTL Ψ paramters
@@ -38,8 +38,8 @@ gibbs_arrival_times = true  # arrival times
 gibbs_ia_params = true     # arrival time distribution parameters
 gibbs_perm_order = true   # order of blocks in partition/vertices in graph
 
-datasets = ["synthetic crp-coupled","synthetic geometric"]
-ia_params = [[1.0], [0.25]] # these correspond to the datasets
+datasets = ["synthetic crp-uncoupled","synthetic geometric"]
+ia_params = [[1.0,0.75], [0.25]] # these correspond to the datasets
 arrival_dists = ["crp-coupled","crp-uncoupled","geometric","poisson"]
 # arrival_dists = ["geometric","poisson"]
 

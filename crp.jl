@@ -313,8 +313,8 @@ end
 # end
 
 function initialize_crp_params(theta_prior::UnivariateDistribution,alpha_prior::UnivariateDistribution)
-  alpha = rand(alpha_prior)
-  theta = rand(theta_prior)
+  alpha = mean(alpha_prior)
+  theta = mean(theta_prior)
   return [theta; alpha]
 
 end
