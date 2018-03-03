@@ -218,6 +218,8 @@ if save_output
       "alpha_mean_d",alpha_mean_d,
       "ESS_slack_logd",ESS_slack_logd,
       "slack_mean_d",slack_mean_d,
+      "pred_ll_mean",pred_ll_mean,
+      "pred_ll_se",pred_ll_se,
       "spl_out_all",spl_out_all)
 
   save(dirname * "syn_data.jld",
