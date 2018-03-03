@@ -102,6 +102,42 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
 
 end
 
+function logp_pred_partition(P_train::Vector{Int},PP_test::Vector{Int},
+        T_train::Vector{Int},T_test::Vector{Int},
+        alpha::Float64,ia_dist::DiscreteDistribution,is_partition::Bool)
+    f = (x,y) -> ia_dist
+    logp_pred_partition(PP,T_train,T_test,alpha,f,is_partition)
+end
+
+function logp_pred_partition(PP_train::Vector{Int},PP_test::Vector{Int},
+        T::Vector{Int},
+        alpha::Float64,ia_dist::Function,is_partition::Bool)
+
+    zero_shift = Int(minimum(ia_dist(1,1)) == 0)
+    K_train = length(PP_train)
+    K_test = length(PP_test)
+
+    T_train = T[1:K_train]
+
+    PP_train_bar = cumsum(PP_train)
+    logp_train = log_CPPF(PP_train,T_train,alpha)
+    is_partition ? logp_train += sum([lbinom(PP_train_bar[j] - T_train[j],PP_train[j] - 1) for j in 2:length(PP_train)]) : nothing
+
+    PP_test_bar = cumsum(PP_test)
+    logp_test = log_CPPF(PP_test,T,alpha)
+    is_partition ? logp_test += sum([lbinom(PP_test_bar[j] - T[j],PP_test[j] - 1) for j in 2:length(PP_test)]) : nothing
+
+    N = PP_test_bar[end]
+
+    if N - T[end] > 0
+      p_gt = 1 - cdf(ia_dist(T[end],K_test), N-T[end]-zero_shift)
+      abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? logp_test = -Inf : logp_test += log(p_gt)
+    end
+    logp_test += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]) for j in (K_train+1):K_test])
+
+    return logp_test - logp_train
+end
+
 # memoize this?
 function lbinom(n::Int,k::Int)
     """

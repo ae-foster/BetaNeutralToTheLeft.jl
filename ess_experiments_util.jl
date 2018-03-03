@@ -57,7 +57,7 @@ function genSynDegrees(dataset_name::String,N::Int,ntl_alpha::Float64,ia_params:
     assert(all(T_data .== get_arrivals(Z_data)))
 
   end
-  return PP_data,T_data
+  return PP_data,T_data,Z_data
 end
 
 
