@@ -103,10 +103,10 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
 end
 
 function logp_pred_partition(P_train::Vector{Int},PP_test::Vector{Int},
-        T_train::Vector{Int},T_test::Vector{Int},
+        T::Vector{Int},
         alpha::Float64,ia_dist::DiscreteDistribution,is_partition::Bool)
     f = (x,y) -> ia_dist
-    logp_pred_partition(PP,T_train,T_test,alpha,f,is_partition)
+    logp_pred_partition(PP,T,alpha,f,is_partition)
 end
 
 function logp_pred_partition(PP_train::Vector{Int},PP_test::Vector{Int},
