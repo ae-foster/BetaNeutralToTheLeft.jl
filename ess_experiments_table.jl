@@ -2,12 +2,22 @@ using JLD
 using JSON
 using StatsBase
 
+include("dataset.jl")
+include("crp.jl")
+include("geometric_ia.jl")
+include("poisson_ia.jl")
+include("ntl_gibbs.jl")
+include("slice.jl")
+include("evaluation.jl")
+include("gibbs_util.jl")
+include("ess_experiments_util.jl")
+
 ######################
 # results filenames
 ######################
-syn_data_file = "./ess_output/gibbs_2018-02-26_21-46-41_syn_data.jld"
-results_file = "./ess_output/gibbs_2018-02-26_21-46-41_ess_results.jld"
-params_file = "./ess_output/gibbs_2018-02-26_21-46-41_params.json"
+syn_data_file = "./ess_output/gibbs_2018-03-05_17-13-17_syn_data.jld"
+results_file = "./ess_output/gibbs_2018-03-05_17-13-17_ess_results.jld"
+params_file = "./ess_output/gibbs_2018-03-05_17-13-17_params.json"
 
 
 ######################
@@ -31,7 +41,8 @@ n_ad = size(params["arrival_dists"],1)
 # calculate statistics for table
 ######################
 
-data_keys = ["alpha_mean_d";"slack_mean_d";"runtimes";"ESS_sigma_logd"]
+data_keys = ["alpha_mean_d";"slack_mean_d";"pred_ll_mean";"runtimes";"ESS_sigma_logd"]
+data_keys_se = ["alpha_se_d";"slace_se_d";"pred_ll_se"]
 # print_fmt_mn = ["\$%.1f\$";"\$%.2f\$";"\$%.3f\$";"\$%.2f\$";"\$%.2f\$";"\$%.2f\$"]
 # # print_fmt_se = ["\$(%.1e)\$","\$%.2f\$","\$%.3f\$","\$%.2f\$","\$%.2f\$","\$%.2f\$"]
 #
@@ -40,7 +51,11 @@ data_keys = ["alpha_mean_d";"slack_mean_d";"runtimes";"ESS_sigma_logd"]
 for d in 1:size(data_keys,1)
 
   mn = squeeze(mean(results[data_keys[d]],3),3)
-  se = sqrt.(squeeze(var(results[data_keys[d]],3)./size(results[data_keys[d]],3),3))
+  if d <= size(data_keys_se,1)
+    se = squeeze(mean(results[data_keys_se[d]],3),3)
+  else
+    se = sqrt.(squeeze(var(results[data_keys[d]],3)./size(results[data_keys[d]],3),3))
+  end
 
   mn_fmt = [@sprintf("\$%.2f", mn'[i]) for i in 1:prod(size(mn))]
   se_fmt = [@sprintf("%.2f\$",se'[i]) for i in 1:prod(size(se))]

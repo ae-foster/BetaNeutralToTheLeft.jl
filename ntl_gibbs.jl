@@ -92,7 +92,7 @@ function logp_partition(PP::Vector{Int},T::Vector{Int},
       abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? log_p = -Inf : log_p += log(p_gt)
       # log_p += log(1 - cdf(ia_dist(T[end],K), N-T[end]-zero_shift))
     end
-    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]) for j in 2:K ])
+    log_p += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]-zero_shift) for j in 2:K ])
     # include binomial coefficients if for a partition
     if is_partition
       log_p += sum([lbinom(PP_bar[j] - T[j],PP[j] - 1) for j in 2:K])
@@ -104,14 +104,16 @@ end
 
 function logp_pred_partition(PP_train::Vector{Int},PP_test::Vector{Int},
         T::Vector{Int},
-        alpha::Float64,ia_dist::DiscreteDistribution,is_partition::Bool)
+        alpha::Float64,ia_dist::DiscreteDistribution,
+        is_partition_train::Bool,is_partition_test::Bool)
     f = (x,y) -> ia_dist
-    logp_pred_partition(PP_train,PP_test,T,alpha,f,is_partition)
+    logp_pred_partition(PP_train,PP_test,T,alpha,f,is_partition_train,is_partition_test)
 end
 
 function logp_pred_partition(PP_train::Vector{Int},PP_test::Vector{Int},
         T::Vector{Int},
-        alpha::Float64,ia_dist::Function,is_partition::Bool)
+        alpha::Float64,ia_dist::Function,
+        is_partition_train::Bool,is_partition_test::Bool)
 
     zero_shift = Int(minimum(ia_dist(1,1)) == 0)
     K_train = length(PP_train)
@@ -120,12 +122,22 @@ function logp_pred_partition(PP_train::Vector{Int},PP_test::Vector{Int},
     T_train = T[1:K_train]
 
     PP_train_bar = cumsum(PP_train)
+    N_train = PP_train_bar[end]
     logp_train = log_CPPF(PP_train,T_train,alpha)
-    is_partition ? logp_train += sum([lbinom(PP_train_bar[j] - T_train[j],PP_train[j] - 1) for j in 2:length(PP_train)]) : nothing
+    # is_partition_train ? logp_train += sum([lbinom(PP_train_bar[j] - T_train[j],PP_train[j] - 1) for j in 2:length(PP_train)]) : nothing
 
     PP_test_bar = cumsum(PP_test)
     logp_test = log_CPPF(PP_test,T,alpha)
-    is_partition ? logp_test += sum([lbinom(PP_test_bar[j] - T[j],PP_test[j] - 1) for j in 2:length(PP_test)]) : nothing
+    # is_partition_test ? logp_test += sum([lbinom(PP_test_bar[j] - T_test[j],PP_test[j] - 1) for j in 2:length(PP_test)]) : nothing
+    if is_partition_test
+      # predicted part of partition is as usual
+      logp_test += sum([lbinom(PP_test_bar[j] - T[j],PP_test[j] - 1) for j in (K_train+1):length(PP_test)])
+      # conditioned part of partition is constrained
+      for j in 1:K_train
+        ( PP_test[j] - N_train > 0 && PP_test_bar[j] - PP_train_bar[j] > 0 )?
+          logp_test += lbinom(PP_test_bar[j] - N_train,PP_test[j] - PP_train[j]) : nothing
+      end
+    end
 
     N = PP_test_bar[end]
 
@@ -133,7 +145,7 @@ function logp_pred_partition(PP_train::Vector{Int},PP_test::Vector{Int},
       p_gt = 1 - cdf(ia_dist(T[end],K_test), N-T[end]-zero_shift)
       abs(p_gt)<=eps(one(typeof(p_gt))) || p_gt < 0. ? logp_test = -Inf : logp_test += log(p_gt)
     end
-    logp_test += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]) for j in (K_train+1):K_test])
+    logp_test += sum( [logpdf(ia_dist(T[j-1],j-1),T[j]-T[j-1]-zero_shift) for j in (K_train+1):K_test])
 
     return logp_test - logp_train
 end

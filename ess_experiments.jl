@@ -109,7 +109,7 @@ for ds in 1:size(datasets,1)
   # sort partition if necessary
   if gibbs_perm_order
     PP_sort = sortrows(hcat(PP_data,collect(1:size(PP_data,1))),rev=true)
-    PP_sort_perm = sortperm(PP_data,rev=true)
+    # PP_sort_perm = sortperm(PP_data,rev=true)
     # sort ties in ascending order of original order for plotting purposes
     maxdeg = maximum(PP_sort)
     for j in 1:maxdeg
@@ -119,7 +119,7 @@ for ds in 1:size(datasets,1)
     PP = PP_sort[:,1]
 
     K_train = length(PP)
-    PP_all_train_sort = PP_test[[PP_sort_perm;(K_train+1):end]]
+    PP_all_train_sort = PP_test[[perm_data;(K_train+1):end]]
 
     # rand_idx = randperm(size(PP_data,1))
     # perm_data = collect(1:size(PP_data,1))[rand_idx]
@@ -182,7 +182,7 @@ for ds in 1:size(datasets,1)
         pred_ll[s] = logp_pred_partition(
                       PP[spl_out.sigma[:,s]],PP_all_train_sort[[spl_out.sigma[:,s];(K_train+1):end]],
                       [spl_out.T[:,s];T_test[(K_train+1):end]],
-                      spl_out.alpha[s],ia_dist(spl_out.ia_params[:,s]),true)
+                      spl_out.alpha[s],ia_dist(spl_out.ia_params[:,s]),false,false) # treat as sequence
       end
       pred_ll_mean[ds,ad,nr] = mean(pred_ll)
       pred_ll_se[ds,ad,nr] = sqrt(var(pred_ll)/length(pred_ll))
@@ -213,11 +213,14 @@ if save_output
       "ESS_logp",ESS_logp,
       "ESS_sigma_logd",ESS_sigma_logd,
       "sigma_mean_d",sigma_mean_d,
+      "sigma_se_d",sigma_se_d,
       "ESS_T_logd",ESS_T_logd,
       "T_mean_d",T_mean_d,
       "alpha_mean_d",alpha_mean_d,
+      "alpha_se_d",alpha_se_d,
       "ESS_slack_logd",ESS_slack_logd,
       "slack_mean_d",slack_mean_d,
+      "slack_se_d",slack_se_d,
       "pred_ll_mean",pred_ll_mean,
       "pred_ll_se",pred_ll_se,
       "spl_out_all",spl_out_all)
@@ -227,7 +230,7 @@ if save_output
       "T_data_all",T_data_all)
 
   params = OrderedDict(
-  "datasets" => datasets, "arrival_dists" => arrival_dists, "ntl_alpha" => ntl_alpha, "N" => N, "ia_params" => ia_params,
+  "datasets" => datasets, "arrival_dists" => arrival_dists, "ntl_alpha" => ntl_alpha, "N_train" => N_train, "N_test" => N_test, "ia_params" => ia_params,
   "n_iter" => n_iter, "n_burn" => n_burn, "n_thin" => n_thin, "n_rep" => n_rep,
   "gibbs_psi" => gibbs_psi, "gibbs_alpha" => gibbs_alpha, "gibbs_arrival_times" => gibbs_arrival_times, "gibbs_ia_params" => gibbs_ia_params, "gibbs_perm_order" => gibbs_perm_order,
   "ntl_gamma_a" => ntl_gamma_a, "ntl_gamma_b" => ntl_gamma_b, "w_alpha" => w_alpha
