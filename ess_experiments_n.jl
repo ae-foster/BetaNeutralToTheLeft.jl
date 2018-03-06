@@ -85,6 +85,9 @@ alpha_se_d = zeros(Float64,n_s,n_rep)
 slack_mean_d = zeros(Float64,n_s,n_rep)
 slack_se_d = zeros(Float64,n_s,n_rep)
 
+pred_ll_mean = zeros(Float64,n_s,n_rep)
+pred_ll_se = zeros(Float64,n_s,n_rep)
+
 
 ## SET SEED
 srand(0)
@@ -108,6 +111,9 @@ for n in 1:length(n_sub)
     end
     perm_data = PP_sort[:,2]
     PP = PP_sort[:,1]
+
+    K_train = length(PP)
+    PP_all_train_sort = PP_data_all[[perm_data;(K_train+1):end]]
 
     # rand_idx = randperm(size(PP_data,1))
     # perm_data = collect(1:size(PP_data,1))[rand_idx]
@@ -163,6 +169,16 @@ for n in 1:length(n_sub)
     ESS_slack_logd[n,nr] = ess_factor_estimate(log.(slack_d))[1]
     slack_mean_d[n,nr] = mean(slack_d)
     slack_se_d[n,nr] = sqrt(var(slack_d)/length(slack_d))
+
+    pred_ll = zeros(Float64,size(spl_out.alpha,1))
+    for s in 1:size(spl_out.alpha,1)
+      pred_ll[s] = logp_pred_partition(
+                    PP[spl_out.sigma[:,s]],PP_all_train_sort[[spl_out.sigma[:,s];(K_train+1):end]],
+                    [spl_out.T[:,s];T_data_all[(K_train+1):end]],
+                    spl_out.alpha[s],ia_dist(spl_out.ia_params[:,s]),false,false) # treat as sequence
+    end
+    pred_ll_mean[n,nr] = mean(pred_ll)
+    pred_ll_se[n,nr] = sqrt(var(pred_ll)/length(pred_ll))
 
     println("\n > Finished with ",nr," out of ",n_rep," repetitions.")
   end

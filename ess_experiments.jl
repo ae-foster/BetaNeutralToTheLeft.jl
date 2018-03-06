@@ -227,7 +227,8 @@ if save_output
 
   save(dirname * "syn_data.jld",
       "PP_data_all",PP_data_all,
-      "T_data_all",T_data_all)
+      "T_data_all",T_data_all,
+      "K_data_all",K_data_all)
 
   params = OrderedDict(
   "datasets" => datasets, "arrival_dists" => arrival_dists, "ntl_alpha" => ntl_alpha, "N_train" => N_train, "N_test" => N_test, "ia_params" => ia_params,

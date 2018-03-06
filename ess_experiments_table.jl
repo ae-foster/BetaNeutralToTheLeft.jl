@@ -15,9 +15,9 @@ include("ess_experiments_util.jl")
 ######################
 # results filenames
 ######################
-syn_data_file = "./ess_output/gibbs_2018-03-05_17-13-17_syn_data.jld"
-results_file = "./ess_output/gibbs_2018-03-05_17-13-17_ess_results.jld"
-params_file = "./ess_output/gibbs_2018-03-05_17-13-17_params.json"
+syn_data_file = "./ess_output/gibbs_2018-03-05_22-01-23_syn_data.jld"
+results_file = "./ess_output/gibbs_2018-03-05_22-01-23_ess_results.jld"
+params_file = "./ess_output/gibbs_2018-03-05_22-01-23_params.json"
 
 
 ######################
@@ -42,7 +42,7 @@ n_ad = size(params["arrival_dists"],1)
 ######################
 
 data_keys = ["alpha_mean_d";"slack_mean_d";"pred_ll_mean";"runtimes";"ESS_sigma_logd"]
-data_keys_se = ["alpha_se_d";"slace_se_d";"pred_ll_se"]
+data_keys_se = ["alpha_se_d";"slack_se_d";"pred_ll_se"]
 # print_fmt_mn = ["\$%.1f\$";"\$%.2f\$";"\$%.3f\$";"\$%.2f\$";"\$%.2f\$";"\$%.2f\$"]
 # # print_fmt_se = ["\$(%.1e)\$","\$%.2f\$","\$%.3f\$","\$%.2f\$","\$%.2f\$","\$%.2f\$"]
 #
@@ -57,8 +57,8 @@ for d in 1:size(data_keys,1)
     se = sqrt.(squeeze(var(results[data_keys[d]],3)./size(results[data_keys[d]],3),3))
   end
 
-  mn_fmt = [@sprintf("\$%.2f", mn'[i]) for i in 1:prod(size(mn))]
-  se_fmt = [@sprintf("%.2f\$",se'[i]) for i in 1:prod(size(se))]
+  mn_fmt = [@sprintf("\$%.3f", mn'[i]) for i in 1:prod(size(mn))]
+  se_fmt = [@sprintf("%.3f\$",se'[i]) for i in 1:prod(size(se))]
 
   fmt = [join([mn_fmt[i],se_fmt[i]]," \\pm ") for i in 1:size(mn_fmt,1)]
   if d==1
@@ -72,9 +72,9 @@ end
 # data and models by hand: gen_alpha, gen_arrival_dist, n, K_n, model_arrival_dist
 alpha_str = @sprintf("%.2f",params["ntl_alpha"])
 theta_str = @sprintf("%.1f",params["ia_params"][1][1])
-K_n_str_1 = @sprintf("%.0f",size(syn_data["T_data_all"][1],1))
+K_n_str_1 = @sprintf("%.0f",size(syn_data["K_data_all"][1],1))
 beta_str = @sprintf("%.2f",params["ia_params"][2][1])
-K_n_str_2 = @sprintf("%.0f",size(syn_data["T_data_all"][2],1))
+K_n_str_2 = @sprintf("%.0f",size(syn_data["K_data_all"][2],1))
 gen_models = ["\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\tau,\\PYP(\\theta,\\tau))\$ & ";
               "\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\alpha,\\PYP(\\theta,\\tau))\$ & ";
               "\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\alpha,\\Geom(\\beta))\$ & ";
