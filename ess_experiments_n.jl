@@ -18,15 +18,15 @@ include("ess_experiments_util.jl")
 ###########################################################################
 # Experiment settings
 ###########################################################################
-save_output = false
-N = 10000 # size of sequence for synthetic data
-n_sub = [100; 1000; 10000]
+save_output = true
+N = 22000 # size of sequence for synthetic data
+n_sub = [200; 2000; 20000]
 
 n_iter = 50000 # 50000  # total number of Gibbs iterations to run
 n_burn = 25000   # burn-in
-n_thin = 1000     # collect every `n_thin` samples
+n_thin = 100     # collect every `n_thin` samples
 
-n_rep = 2 # number of sampling experiment repetitions
+n_rep = 10 # number of sampling experiment repetitions
 
 n_print = 1000 # prints updates every `n_print` iterations
 
@@ -87,6 +87,9 @@ slack_se_d = zeros(Float64,n_s,n_rep)
 
 pred_ll_mean = zeros(Float64,n_s,n_rep)
 pred_ll_se = zeros(Float64,n_s,n_rep)
+
+ia_param_mean_d = zeros(Float64,length(ia_params),n_s,n_rep)
+ia_param_se_d = zeros(Float64,length(ia_params),n_s,n_rep)
 
 
 ## SET SEED
@@ -180,6 +183,9 @@ for n in 1:length(n_sub)
     pred_ll_mean[n,nr] = mean(pred_ll)
     pred_ll_se[n,nr] = sqrt(var(pred_ll)/length(pred_ll))
 
+    ia_param_mean_d[:,n,nr] = mean(abs.(spl_out.ia_params .- ia_params))
+    ia_param_se_d[:,n,nr] = sqrt(var(spl_out.ia_params .- ia_params)/length(spl_out.ia_params))
+
     println("\n > Finished with ",nr," out of ",n_rep," repetitions.")
   end
 
@@ -199,25 +205,33 @@ if save_output
   pathname = dirname * fname
 
   save(pathname,
-      "runtimes",runtimes,
-      "ESS_alpha",ESS_alpha,
-      "ESS_logp",ESS_logp,
-      "ESS_sigma_logd",ESS_sigma_logd,
-      "sigma_mean_d",sigma_mean_d,
-      "ESS_T_logd",ESS_T_logd,
-      "T_mean_d",T_mean_d,
-      "alpha_mean_d",alpha_mean_d,
-      "ESS_slack_logd",ESS_slack_logd,
-      "slack_mean_d",slack_mean_d,
-      "spl_out_all",spl_out_all)
+  "runtimes",runtimes,
+  "ESS_alpha",ESS_alpha,
+  "ESS_logp",ESS_logp,
+  "ESS_sigma_logd",ESS_sigma_logd,
+  "sigma_mean_d",sigma_mean_d,
+  "sigma_se_d",sigma_se_d,
+  "ESS_T_logd",ESS_T_logd,
+  "T_mean_d",T_mean_d,
+  "alpha_mean_d",alpha_mean_d,
+  "alpha_se_d",alpha_se_d,
+  "ESS_slack_logd",ESS_slack_logd,
+  "slack_mean_d",slack_mean_d,
+  "slack_se_d",slack_se_d,
+  "pred_ll_mean",pred_ll_mean,
+  "pred_ll_se",pred_ll_se,
+  "ia_param_mean_d",ia_param_mean_d,
+  "ia_param_se_d",ia_param_se_d,
+  "spl_out_all",spl_out_all)
 
   save(dirname * "syn_data_n_scale.jld",
       "PP_data_all",PP_data_all,
-      "T_data_all",T_data_all)
+      "T_data_all",T_data_all,
+      "K_data_all",K_data_all)
 
   params = OrderedDict(
-  "datasets" => datasets, "arrival_dists" => arrival_dists, "ntl_alpha" => ntl_alpha, "N" => N, "ia_params" => ia_params,
-  "n_iter" => n_iter, "n_burn" => n_burn, "n_thin" => n_thin, "n_rep" => n_rep,
+  "dataset" => dataset, "arrival_dist" => arrival_dist, "ntl_alpha" => ntl_alpha, "N" => N, "ia_params" => ia_params,
+  "n_iter" => n_iter, "n_burn" => n_burn, "n_thin" => n_thin, "n_rep" => n_rep, "n_sub" => n_sub,
   "gibbs_psi" => gibbs_psi, "gibbs_alpha" => gibbs_alpha, "gibbs_arrival_times" => gibbs_arrival_times, "gibbs_ia_params" => gibbs_ia_params, "gibbs_perm_order" => gibbs_perm_order,
   "ntl_gamma_a" => ntl_gamma_a, "ntl_gamma_b" => ntl_gamma_b, "w_alpha" => w_alpha
   )
