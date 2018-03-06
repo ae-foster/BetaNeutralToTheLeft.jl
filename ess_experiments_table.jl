@@ -41,13 +41,13 @@ n_ad = size(params["arrival_dists"],1)
 # calculate statistics for table
 ######################
 
-data_keys = ["alpha_mean_d";"slack_mean_d";"pred_ll_mean";"runtimes";"ESS_sigma_logd"]
+data_keys = ["alpha_mean_d";"slack_mean_d";"pred_ll_mean";"runtimes";"ESS_logp"]
 data_keys_se = ["alpha_se_d";"slack_se_d";"pred_ll_se"]
 # print_fmt_mn = ["\$%.1f\$";"\$%.2f\$";"\$%.3f\$";"\$%.2f\$";"\$%.2f\$";"\$%.2f\$"]
 # # print_fmt_se = ["\$(%.1e)\$","\$%.2f\$","\$%.3f\$","\$%.2f\$","\$%.2f\$","\$%.2f\$"]
 #
 # sf = (s,t) -> @sprintf(s,t)
-
+all_fmt = []
 for d in 1:size(data_keys,1)
 
   mn = squeeze(mean(results[data_keys[d]],3),3)

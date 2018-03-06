@@ -228,6 +228,7 @@ if save_output
   save(dirname * "syn_data.jld",
       "PP_data_all",PP_data_all,
       "T_data_all",T_data_all,
+      "Z_data_all",Z_data_all,
       "K_data_all",K_data_all)
 
   params = OrderedDict(
