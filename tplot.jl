@@ -115,7 +115,7 @@ for fname in readdir(data_dir)
         #######################################################################
 
         p2 = Plots.plot(ts, 1:length(ts), label="Arrivals", line=(3));
-        Plots.plot!(p2, title=fname_parsed, xlabel="Number of observed vertices", ylabel="Ends of edges", guidefont = font(15), legendfont=font(12));
+        Plots.plot!(p2, title=fname_parsed, guidefont = font(15), legend=false); # ylabel="Number of observed vertices", xlabel="Ends of edges"
         # Plots.gui()
         savefig("$plot_dir/arrival_times_$fname_parsed.pdf");
 
