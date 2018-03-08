@@ -20,11 +20,11 @@ include("ess_experiments_util.jl")
 ###########################################################################
 save_output = true
 N = 22000 # size of sequence for synthetic data
-n_sub = [200; 2000; 20000]
+n_sub = [200; 2000; 20000] # ends of edges
 
-n_iter = 50000 # 50000  # total number of Gibbs iterations to run
-n_burn = 25000   # burn-in
-n_thin = 100     # collect every `n_thin` samples
+n_iter = 100000 # 50000  # total number of Gibbs iterations to run
+n_burn = 50000   # burn-in
+n_thin = 1000     # collect every `n_thin` samples
 
 n_rep = 10 # number of sampling experiment repetitions
 
