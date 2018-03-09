@@ -15,9 +15,9 @@ include("ess_experiments_util.jl")
 ######################
 # results filenames
 ######################
-syn_data_file = "./ess_output/gibbs_2018-03-06_18-20-48_syn_data_n_scale.jld"
-results_file = "./ess_output/gibbs_2018-03-06_18-20-48_ess_results_n_scale.jld"
-params_file = "./ess_output/gibbs_2018-03-06_18-20-48_params.json"
+syn_data_file = "./ess_output/gibbs_2018-03-09_17-12-22_syn_data_n_scale.jld"
+results_file = "./ess_output/gibbs_2018-03-09_17-12-22_ess_results_n_scale.jld"
+params_file = "./ess_output/gibbs_2018-03-09_17-12-22_params.json"
 
 
 ######################
@@ -62,8 +62,8 @@ for d in 1:size(data_keys,1)
     se = sqrt.(var(results[data_keys[d]],2)./size(results[data_keys[d]],2))
   end
 
-  mn_fmt = [@sprintf("\$%.3f", mn[i]) for i in 1:length(mn)]
-  se_fmt = [@sprintf("%.3f\$",se[i]) for i in 1:length(se)]
+  mn_fmt = [@sprintf("\$%.4f", mn[i]) for i in 1:length(mn)]
+  se_fmt = [@sprintf("%.4f\$",se[i]) for i in 1:length(se)]
 
   fmt = [join([mn_fmt[i],se_fmt[i]]," \\pm ") for i in 1:length(mn_fmt)]
 
@@ -78,26 +78,18 @@ K_n_str_1 = @sprintf("%.0f",syn_data["K_data_all"][1])
 K_n_str_2 = @sprintf("%.0f",syn_data["K_data_all"][2])
 K_n_str_3 = @sprintf("%.0f",syn_data["K_data_all"][3])
 
-stats = ["\$|\\hat{\\alpha} - \\alpha^*|\$";
-          "\$|\\hat{\\beta} - \\beta^*|\$"];
+stats = ["\$n\$" ;
+          "\$|\\hat{\\alpha} - \\alpha^*|\$";
+          "\$|\\hat{\\beta} - \\beta^*|\$";
           "\$|\\hat{\\mathbf{S}} - \\mathbf{S}^*|\$";
           "Runtime (s)";
           "ESS(\$\\log(p)\$)";
           "ESS(\$\\alpha\$)";
-          
+          "ESS(\$|\\hat{\\mathbf{d}} - \\mathbf{d}^*|\$)";
+          "ESS(\$|\\hat{\\mathbf{S}} - \\mathbf{S}^*|\$)"]
 
 
-gen_models = ["\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\tau,\\PYP(\\theta,\\tau))\$ & ";
-              "\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\alpha,\\PYP(\\theta,\\tau))\$ & ";
-              "\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\alpha,\\Geom(\\beta))\$ & ";
-              "\$\\PYP($theta_str,$alpha_str)\$ & \$$K_n_str_1\$ & \$(\\alpha,\\Poisson_+(\\lambda))\$ & ";
-              "\$\\Geom($beta_str)\$ & \$$K_n_str_2\$ & \$(\\tau,\\PYP(\\theta,\\tau))\$ & ";
-              "\$\\Geom($beta_str)\$ & \$$K_n_str_2\$ & \$(\\alpha,\\PYP(\\theta,\\tau))\$ & ";
-              "\$\\Geom($beta_str)\$ & \$$K_n_str_2\$ & \$(\\alpha,\\Geom(\\beta))\$ & ";
-              "\$\\Geom($beta_str)\$ & \$$K_n_str_2\$ & \$(\\alpha,\\Poisson_+(\\lambda))\$ & "]
-
-
-out_txt = [join([gen_models[i],all_fmt[i]], "") for i in 1:size(all_fmt,1)]
+out_txt = [join([stats[i],all_fmt[i]], " & ") for i in 1:length(stats)]
 
 open("./ess_output/tables/ess_table_n_scale.txt", "w") do f
   for ln in 1:size(out_txt,1)
